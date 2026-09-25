@@ -63,6 +63,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // provider without its key falls back to OpenAI instead of failing.
   let keys: KeyPresence = { openai: false, soniox: false, assemblyai: false, anthropic: false };
   const voiceProviders = () => effectiveVoiceProviders(keys);
+  bridge.setZoom(getConfig().panelZoom);
   const refreshSetup = async () => {
     keys = await keyPresence(context.secrets);
     bridge.setupStatus(await checkSetup(context.secrets));
@@ -322,6 +323,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('kato')) {
         void refreshSetup();
+        bridge.setZoom(getConfig().panelZoom);
       }
     }),
   );

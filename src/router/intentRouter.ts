@@ -202,9 +202,14 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   ),
   tool(
     'explain_deep',
-    'Hand the question to the coding agent (read-only): it reads the real code and returns an overview plus a guided tour. For any question about this project beyond what is on screen, and for every tour/walkthrough request.',
+    'Hand the question to the coding agent (read-only): it reads the real code and returns an overview plus a guided tour. For any question about this project beyond what is on screen, for every tour/walkthrough request, and for "teach me X with this project".',
     {
-      question: { type: 'string', description: "The user's question, verbatim-ish." },
+      question: {
+        type: 'string',
+        description:
+          "The user's request in THEIR words, cleaned of filler only. Never narrow or add scope they did not say — " +
+          'do not mention the open file unless they said "this file"/"este archivo"/"esto".',
+      },
       granularity: {
         type: ['string', 'null'],
         description:

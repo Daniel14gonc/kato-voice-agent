@@ -85,6 +85,8 @@ export class DeepUnderstanding {
     language: string | undefined,
     signal: AbortSignal,
     granularity?: TourGranularity,
+    /** What the user literally said; the router's `question` is a paraphrase. */
+    userWords?: string,
   ): Promise<DeepResult> {
     const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
     if (roots.length === 0) {
@@ -111,7 +113,7 @@ export class DeepUnderstanding {
     let ok = false;
     try {
       const raw = await provider.runReadOnly({
-        prompt: this.buildPrompt(question, language, roots, granularity),
+        prompt: this.buildPrompt(question, language, roots, granularity, userWords),
         cwd: roots[0],
         extraDirs: roots.slice(1),
         model: model || undefined,
@@ -136,6 +138,7 @@ export class DeepUnderstanding {
     language: string | undefined,
     roots: string[],
     granularity?: TourGranularity,
+    userWords?: string,
   ): string {
     const notes = this.notesLine();
     const lang = language === 'en' ? 'English' : 'Spanish';
@@ -170,9 +173,28 @@ export class DeepUnderstanding {
         'stops (a module or logical group each, up to 8). Questions about one file, one feature or one flow → one stop ' +
         'per function/method with its exact line range and a specific explanation (what it takes, does and returns), up to 12. ' +
         'A single function or tricky algorithm asked in depth → block-level stops walking it line by line.\n';
+    const active = vscode.window.activeTextEditor;
+    const openFile = active ? vscode.workspace.asRelativePath(active.document.uri) : undefined;
+    const exact = userWords?.trim() && userWords.trim() !== question.trim() ? userWords.trim() : undefined;
     return (
       'You are exploring a code repository in READ-ONLY mode to answer a developer question and prepare a guided tour of the relevant code.\n\n' +
-      `Question: "${question}"\n\n` +
+      (exact
+        ? `The user said (exact words, transcribed from speech): "${exact}"\nKato's reading of it: "${question}"\n` +
+          'If the two differ in scope, the user\'s exact words win.\n\n'
+        : `Question: "${question}"\n\n`) +
+      (openFile
+        ? `Context only: the user has ${openFile} open in the editor. That does NOT define the scope — use it only if ` +
+          'the user referred to "this file/this code/esto", or as a natural example when it genuinely fits.\n\n'
+        : '') +
+      'First decide what KIND of request this is, and shape the answer and the tour accordingly:\n' +
+      '- LEARNING a language, framework or concept using this project ("teach me Swift with this project", "enséñame ' +
+      'React con esto", "I want to learn how async works here") → a CURRICULUM: pick 6-10 concepts ordered from basic to ' +
+      'advanced, and for each one the clearest example ANYWHERE in the repo (different files, not one file walked top to ' +
+      'bottom). Each stop starts by naming the concept it teaches, then shows it in this code. The overview says what they ' +
+      'will learn and in what order. Assume a beginner unless they say otherwise.\n' +
+      '- ARCHITECTURE / "explain the repo" → section-level stops following how the pieces connect.\n' +
+      '- A FLOW or FEATURE ("how does login work", "trace a request") → stops in execution order across files.\n' +
+      '- A specific FILE or FUNCTION the user named or pointed at → walk that code.\n\n' +
       rootsBlock +
       (notes ? `${notes}\n\n` : '') +
       'Explore the repository as needed (read files, search). Then reply with ONLY a JSON object — no markdown fences, no text before or after:\n' +

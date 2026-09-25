@@ -282,6 +282,13 @@
           "type": "string",
           "default": "Speak fast, with an energetic and natural conversational pace, like a colleague pair-programming. Never drag words or pause dramatically. Pronounce code identifiers in English.",
           "description": "Style instructions passed to the TTS model (gpt-4o-mini-tts only)."
+        },
+        "kato.panel.zoom": {
+          "type": "number",
+          "default": 1.1,
+          "minimum": 0.7,
+          "maximum": 2,
+          "description": "Scale of the whole Kato panel: 1 = VS Code's font size, 1.25 = 25% bigger. Applies immediately."
         }
       }
     }

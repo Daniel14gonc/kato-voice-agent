@@ -42,7 +42,7 @@ import type { Intent } from './intentRouter';
 export type ExecutionResult =
   | { kind: 'speech'; text: string; parts?: SpokenPart[] }
   | { kind: 'llm'; messages: ChatMessage[] }
-  | { kind: 'deep'; question: string; granularity?: TourGranularity };
+  | { kind: 'deep'; question: string; granularity?: TourGranularity; userWords?: string };
 
 const ANSWER_SYSTEM_PROMPT =
   'You are Kato, a voice assistant for programmers inside VS Code. ' +
@@ -199,6 +199,8 @@ export class IntentExecutor {
           kind: 'deep',
           question: String(intent.args.question ?? ''),
           granularity: g === 'block' || g === 'function' || g === 'section' ? g : undefined,
+          // The router paraphrases; the explorer gets the exact words too, and they win.
+          userWords: transcript,
         };
       }
       case 'debug_control': {

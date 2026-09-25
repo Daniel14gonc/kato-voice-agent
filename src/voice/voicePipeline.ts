@@ -457,7 +457,7 @@ export class VoicePipeline {
         this.channel.appendLine(`Kato: ${result.text}`);
         this.brain.session.addAssistant(result.text);
       } else if (result.kind === 'deep') {
-        await this.respondDeep(result.question, config, abort, language, result.granularity);
+        await this.respondDeep(result.question, config, abort, language, result.granularity, result.userWords);
       } else {
         const sentences = new SentenceStream((sentence) => this.enqueueTts(sentence, config, abort, language));
         const languageName = language === 'es' ? 'Spanish' : language === 'en' ? 'English' : language;
@@ -508,6 +508,7 @@ export class VoicePipeline {
     abort: AbortController,
     language?: string,
     granularity?: TourGranularity,
+    userWords?: string,
   ): Promise<void> {
     const es = language !== 'en';
     const agent = this.brain.deep.agentLabel();
@@ -525,7 +526,7 @@ export class VoicePipeline {
 
     let deep: Awaited<ReturnType<DeepUnderstanding['explore']>>;
     try {
-      deep = await this.brain.deep.explore(question, language, abort.signal, granularity);
+      deep = await this.brain.deep.explore(question, language, abort.signal, granularity, userWords);
     } catch (err) {
       if (abort.signal.aborted) {
         return;
@@ -549,7 +550,7 @@ export class VoicePipeline {
       deep.stops.length > 0
         ? es
           ? ` Preparé un tour de ${deep.stops.length} paradas por el código. Di "siguiente" para empezar.`
-          : ` I prepared a ${deep.stops.length}-stop tour through the code. Say "next" to start.`
+          : ` I prepared a tour with ${deep.stops.length} stops through the code. Say "next" to start.`
         : '';
     const intro = `${deep.overview}${tourIntro}`;
     // The result is a new message, not a continuation of the "give me a moment".

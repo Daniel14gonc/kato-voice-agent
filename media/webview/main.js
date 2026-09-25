@@ -708,6 +708,9 @@
       case 'setupStatus':
         renderSetup(msg.items);
         break;
+      case 'zoom':
+        document.body.style.zoom = String(Math.min(2, Math.max(0.7, Number(msg.value) || 1)));
+        break;
     }
   });
 

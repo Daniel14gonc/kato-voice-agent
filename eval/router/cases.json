@@ -1374,5 +1374,17 @@
     "expect": "agent_delegate",
     "context": "default",
     "note": "push stays with the agent"
+  },
+  {
+    "utterance": "Can you teach me Swift with this project?",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "learning request → curriculum tour; must not be narrowed to the open file"
+  },
+  {
+    "utterance": "enséñame React usando este proyecto",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "learning request → curriculum tour; must not be narrowed to the open file"
   }
 ]

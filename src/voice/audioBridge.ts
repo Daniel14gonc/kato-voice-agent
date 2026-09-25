@@ -34,6 +34,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   private readyResolve: (() => void) | undefined;
   /** Replayed when the page (re)loads: it may come up after the status was sent. */
   private lastSetup: object | undefined;
+  private lastZoom: object | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -87,6 +88,9 @@ export class AudioBridge implements vscode.WebviewViewProvider {
         this.readyResolve?.();
         if (this.lastSetup) {
           this.post(this.lastSetup);
+        }
+        if (this.lastZoom) {
+          this.post(this.lastZoom);
         }
         break;
       case 'playbackStarted':
@@ -181,6 +185,12 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   /** A milestone line in the conversation (task started, step done, finished). */
   agentMilestone(text: string): void {
     this.post({ type: 'agentMilestone', text });
+  }
+
+  /** Scales the whole panel (kato.panel.zoom). Replayed when the page reloads. */
+  setZoom(zoom: number): void {
+    this.lastZoom = { type: 'zoom', value: zoom };
+    this.post(this.lastZoom);
   }
 
   /** Setup checklist for the empty state (keys, ffmpeg, agent CLI). */
@@ -279,7 +289,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     #agent[data-state="waiting_approval"] { border-left-color: var(--vscode-charts-yellow); }
     #agent[data-state="ready"] { border-left-color: var(--vscode-charts-green); }
     #agent[data-state="exploring"] { border-left-color: var(--vscode-charts-purple, var(--vscode-charts-blue)); }
-    .agent-head { display: flex; align-items: center; gap: 7px; }
+    .agent-head { display: flex; align-items: center; gap: 8px; font-size: 1.08em; flex-wrap: wrap; }
     #agent-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--vscode-descriptionForeground); }
     #agent[data-state="working"] #agent-dot,
     #agent[data-state="starting"] #agent-dot { background: var(--vscode-charts-blue); animation: pulse 1s ease-in-out infinite; }
@@ -287,23 +297,23 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     #agent[data-state="waiting_approval"] #agent-dot { background: var(--vscode-charts-yellow); animation: pulse 0.7s ease-in-out infinite; }
     #agent[data-state="ready"] #agent-dot { background: var(--vscode-charts-green); }
     #agent-name { font-weight: 700; }
-    #agent-state { opacity: 0.8; font-size: 0.9em; }
+    #agent-state { opacity: 0.85; }
     .agent-chip {
-      font-size: 0.78em; padding: 0 5px; border-radius: 3px;
+      font-size: 0.85em; padding: 0 6px; border-radius: 4px;
       border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.35));
       opacity: 0.8;
     }
     .agent-chip:empty { display: none; }
-    #agent-time { margin-left: auto; opacity: 0.7; font-size: 0.85em; font-variant-numeric: tabular-nums; }
-    #agent-task { font-size: 0.85em; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    #agent-time { margin-left: auto; opacity: 0.75; font-size: 0.92em; font-variant-numeric: tabular-nums; }
+    #agent-task { font-size: 1em; opacity: 0.85; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     /* Progress: real when the agent keeps a step list, indeterminate otherwise. */
-    #agent-progress { height: 3px; border-radius: 2px; overflow: hidden; background: var(--vscode-editor-background); position: relative; }
+    #agent-progress { height: 4px; border-radius: 2px; overflow: hidden; background: var(--vscode-editor-background); position: relative; }
     #agent-progress-bar { height: 100%; width: 0%; background: var(--vscode-charts-blue); transition: width 300ms ease; }
     #agent-progress.indeterminate #agent-progress-bar { width: 30%; position: absolute; animation: slide 1.4s ease-in-out infinite; }
     #agent[data-state="ready"] #agent-progress-bar { background: var(--vscode-charts-green); width: 100%; animation: none; position: static; }
     #agent[data-state="waiting_approval"] #agent-progress-bar { background: var(--vscode-charts-yellow); animation-play-state: paused; }
     @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
-    #agent-steps { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.85em; }
+    #agent-steps { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 1em; }
     #agent-steps:empty { display: none; }
     #agent-steps li { display: flex; gap: 6px; opacity: 0.55; }
     #agent-steps li::before { content: "○"; width: 1em; flex: none; text-align: center; }
@@ -312,15 +322,15 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     #agent-steps li[data-status="completed"] { opacity: 0.7; }
     #agent-steps li[data-status="completed"]::before { content: "✓"; color: var(--vscode-charts-green); }
     #agent-now {
-      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em; opacity: 0.8;
+      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; opacity: 0.85;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #agent-now::before { content: "◌ "; }
     #agent-now:empty { display: none; }
     /* The agent's own prose, streamed: proof of life between tool calls. */
     #agent-stream {
-      font-size: 0.82em; opacity: 0.62; line-height: 1.4;
-      max-height: 4.2em; overflow: hidden; font-style: italic;
+      font-size: 0.95em; opacity: 0.7; line-height: 1.45;
+      max-height: 4.4em; overflow: hidden; font-style: italic;
     }
     #agent-stream:empty { display: none; }
     /* The permission prompt: plain-language title, the exact command below. */
@@ -331,24 +341,25 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       background: var(--vscode-input-background);
     }
     #agent-ask.open { display: flex; }
-    #agent-ask-title { font-size: 0.9em; font-weight: 600; }
+    #agent-ask-title { font-size: 1.02em; font-weight: 600; }
     #agent-ask-detail {
-      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em; opacity: 0.8;
+      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.9em; opacity: 0.85;
       white-space: pre-wrap; word-break: break-all; max-height: 7em; overflow: auto;
     }
     #agent-ask-detail:empty { display: none; }
-    #agent-ask-hint { font-size: 0.78em; opacity: 0.7; }
+    #agent-ask-hint { font-size: 0.88em; opacity: 0.75; }
     /* Every tool call, collapsed: there when you want it, never in the way. */
-    #agent-log { font-size: 0.8em; }
+    #agent-log { font-size: 0.95em; }
     #agent-log summary { cursor: pointer; opacity: 0.6; user-select: none; }
     #agent-log summary:hover { opacity: 0.9; }
-    #agent-log-rows { max-height: 180px; overflow-y: auto; margin-top: 4px; display: flex; flex-direction: column; gap: 1px; }
+    #agent-log-rows .activity { font-size: 0.95em; opacity: 0.75; }
+    #agent-log-rows { max-height: 220px; overflow-y: auto; margin-top: 4px; display: flex; flex-direction: column; gap: 1px; }
     #agent-log-rows .activity[data-output="1"] { cursor: pointer; text-decoration: underline dotted; }
 
     /* History */
     #history { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
     .turn { display: flex; flex-direction: column; gap: 3px; max-width: 92%; }
-    .turn .who { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; }
+    .turn .who { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; }
     .bubble { padding: 7px 10px; border-radius: var(--kato-radius); white-space: pre-wrap; line-height: 1.45; }
     .turn.user { align-self: flex-end; align-items: flex-end; }
     .turn.user .bubble {
@@ -367,7 +378,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     .bubble p + p { margin-top: 0.5em; }
     .activity {
       align-self: flex-start; font-family: var(--vscode-editor-font-family, monospace);
-      font-size: 0.78em; opacity: 0.6; padding-left: 4px;
+      font-size: 0.88em; opacity: 0.65; padding-left: 4px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
     }
     .activity::before { content: "› "; opacity: 0.7; }
@@ -376,7 +387,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     .activity[data-state="error"]::before { content: "✗ "; color: var(--vscode-charts-red); opacity: 0.9; }
     .activity[data-state="running"] { opacity: 0.85; }
     .milestone {
-      align-self: stretch; font-size: 0.8em; opacity: 0.75; padding: 1px 4px;
+      align-self: stretch; font-size: 0.92em; opacity: 0.8; padding: 2px 6px;
       border-left: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.35));
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }

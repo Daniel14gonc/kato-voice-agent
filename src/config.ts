@@ -40,6 +40,8 @@ export interface KatoConfig {
   /** 'milestones' = plan + occasional progress + done; 'minimal' = only when it needs you or finishes. */
   agentSpokenUpdates: string;
   tourGranularity: string;
+  /** Scale of the whole Kato panel (1 = VS Code's font size). */
+  panelZoom: number;
 }
 
 export function getConfig(): KatoConfig {
@@ -74,6 +76,7 @@ export function getConfig(): KatoConfig {
     agentDefaultMode: cfg.get<string>('agent.defaultMode', ''),
     agentSpokenUpdates: cfg.get<string>('agent.spokenUpdates', 'milestones'),
     tourGranularity: cfg.get<string>('tour.granularity', 'auto'),
+    panelZoom: cfg.get<number>('panel.zoom', 1.1),
   };
 }
 
