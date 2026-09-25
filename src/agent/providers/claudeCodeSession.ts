@@ -20,6 +20,7 @@ import {
   type StartSessionOptions,
   type ToolActivity,
 } from '../agentSession';
+import { CLAUDE_MISSING, resolveClaudeCli } from '../cliPaths';
 import { isReadOnlyCommand } from '../safeCommands';
 
 /** The SDK is ESM-only and our bundle is CJS: load it via native dynamic
@@ -99,10 +100,13 @@ export class ClaudeCodeSessionProvider implements AgentSessionProvider {
   readonly modes = MODES;
   readonly capabilities: AgentCapabilities = { liveSteering: true };
 
-  constructor(private readonly log: (message: string) => void) {}
+  constructor(
+    private readonly log: (message: string) => void,
+    private readonly getCliPath: () => string = () => '',
+  ) {}
 
   startSession(options: StartSessionOptions): AgentSession {
-    return new ClaudeCodeSession(options, this.log);
+    return new ClaudeCodeSession(options, this.log, resolveClaudeCli(this.getCliPath()));
   }
 }
 
@@ -137,6 +141,8 @@ class ClaudeCodeSession implements AgentSession {
   constructor(
     private readonly options: StartSessionOptions,
     private readonly log: (message: string) => void,
+    /** The user's own `claude`; undefined = the SDK's bundled binary, if installed. */
+    private readonly cliPath: string | undefined,
   ) {
     this.mode = options.mode;
     void this.run();
@@ -151,6 +157,7 @@ class ClaudeCodeSession implements AgentSession {
           cwd: this.options.cwd,
           additionalDirectories: this.options.extraDirs,
           permissionMode: permissionModeFor(this.mode),
+          ...(this.cliPath ? { pathToClaudeCodeExecutable: this.cliPath } : {}),
           systemPrompt: { type: 'preset', preset: 'claude_code', append: voiceSystemPrompt(this.options.es) },
           ...(this.options.model ? { model: this.options.model } : {}),
           abortController: this.abort,
@@ -178,7 +185,11 @@ class ClaudeCodeSession implements AgentSession {
     } catch (err) {
       if (!this.abort.signal.aborted) {
         this.state = 'closed';
-        this.options.events.onError(String(err instanceof Error ? err.message : err));
+        const message = String(err instanceof Error ? err.message : err);
+        // No installed CLI and no bundled binary (the packaged extension ships none).
+        this.options.events.onError(
+          !this.cliPath && /ENOENT|not found|executable|native binary/i.test(message) ? CLAUDE_MISSING : message,
+        );
       }
     }
     if (this.state !== 'closed') {

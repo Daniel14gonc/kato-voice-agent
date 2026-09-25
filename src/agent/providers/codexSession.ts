@@ -1,5 +1,6 @@
 import type { Codex, SandboxMode, Thread, ThreadEvent, ThreadOptions } from '@openai/codex-sdk';
 import type { AgentExploreRequest, AgentProvider } from '../agentProvider';
+import { CODEX_MISSING, resolveCodexCli } from '../cliPaths';
 import type {
   AgentCapabilities,
   AgentMode,
@@ -115,7 +116,7 @@ class CodexSession implements AgentSession {
   private async ensureThread(): Promise<Thread> {
     if (!this.codex) {
       const sdk = await importSdk();
-      this.codex = new sdk.Codex();
+      this.codex = newCodex(sdk);
     }
     if (!this.thread) {
       this.thread = this.threadId
@@ -283,7 +284,7 @@ export class CodexExploreAgent implements AgentProvider {
 
   async runReadOnly(request: AgentExploreRequest): Promise<string> {
     const sdk = await importSdk();
-    const codex = new sdk.Codex();
+    const codex = newCodex(sdk);
     const thread = codex.startThread({
       workingDirectory: request.cwd,
       additionalDirectories: request.extraDirs,
@@ -339,8 +340,17 @@ function changeLabel(kind: 'add' | 'delete' | 'update', path: string): Spoken {
   return { es: `editar ${short}`, en: `edit ${short}` };
 }
 
+/** Drives the user's installed `codex` when there is one (the packaged extension bundles no binary). */
+function newCodex(sdk: typeof import('@openai/codex-sdk')): Codex {
+  const cli = resolveCodexCli();
+  return new sdk.Codex(cli ? { codexPathOverride: cli } : {});
+}
+
 function codexError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
+  if (!resolveCodexCli() && /ENOENT|not found|unable to locate|binary/i.test(message)) {
+    return CODEX_MISSING;
+  }
   if (/ENOENT|not found|login|auth/i.test(message)) {
     return `${message} — puede que necesites autenticarte con "codex login".`;
   }

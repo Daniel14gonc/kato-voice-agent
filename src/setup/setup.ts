@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { findBinary } from '../agent/cliPaths';
 import { getConfig, SECRET_KEYS, type KeyProvider } from '../config';
 import { OPENAI_VOICES } from '../voice/voiceCatalog';
 
@@ -64,23 +65,6 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 // ---------- detection ----------
-
-function findBinary(name: string, extra: string[] = []): string | undefined {
-  const dirs = [
-    ...(process.env.PATH ?? '').split(path.delimiter),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    path.join(os.homedir(), '.local', 'bin'),
-    ...extra,
-  ];
-  for (const dir of dirs) {
-    const candidate = path.join(dir, name);
-    if (dir && existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return undefined;
-}
 
 export interface AgentDetection {
   id: 'claude-code' | 'codex';

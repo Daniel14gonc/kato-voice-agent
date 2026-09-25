@@ -1,0 +1,38 @@
+# Only what the extension needs at runtime ships in the .vsix: dist/extension.js,
+# media/, package.json, README, LICENSE and the two agent SDKs (loaded from
+# node_modules at runtime, see esbuild.mjs).
+
+# Secrets and local scratch — never packaged.
+.env
+.env.*
+temp.txrt
+dump.txt
+*.vsix
+
+# Sources, tooling, evals.
+src/**
+eval/**
+docs/**
+.vscode/**
+.github/**
+.gitignore
+esbuild.mjs
+tsconfig.json
+dist/*.map
+dist/eval-router.js
+
+# Per-platform agent binaries (~300 MB each). Kato drives the user's installed
+# `claude` / `codex` CLI instead (src/agent/cliPaths.ts).
+node_modules/@anthropic-ai/claude-agent-sdk-*/**
+node_modules/@openai/codex-darwin-*/**
+node_modules/@openai/codex-linux-*/**
+node_modules/@openai/codex-win32-*/**
+
+# Type declarations, docs and tests inside dependencies.
+node_modules/**/*.d.ts
+node_modules/**/*.d.mts
+node_modules/**/*.d.cts
+node_modules/**/*.map
+node_modules/**/*.md
+node_modules/**/test/**
+node_modules/**/tests/**

@@ -1,8 +1,6 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import type { AgentExploreRequest, AgentProvider } from '../agentProvider';
+import { CLAUDE_MISSING, resolveClaudeCli } from '../cliPaths';
 import { describeTool, toolDetail } from './claudeCodeSession';
 
 /**
@@ -18,16 +16,8 @@ export class ClaudeCodeAgent implements AgentProvider {
   constructor(private readonly getCliPath: () => string) {}
 
   private resolveCli(): string {
-    const configured = this.getCliPath();
-    const candidates = [
-      ...(configured ? [configured] : []),
-      path.join(os.homedir(), '.claude', 'local', 'claude'),
-      '/opt/homebrew/bin/claude',
-      '/usr/local/bin/claude',
-      path.join(os.homedir(), '.local', 'bin', 'claude'),
-    ];
     // Fall back to PATH resolution if no known location exists.
-    return candidates.find((c) => existsSync(c)) ?? 'claude';
+    return resolveClaudeCli(this.getCliPath()) ?? 'claude';
   }
 
   runReadOnly(request: AgentExploreRequest): Promise<string> {
@@ -67,7 +57,7 @@ export class ClaudeCodeAgent implements AgentProvider {
         request.signal.removeEventListener('abort', onAbort);
         reject(
           err.code === 'ENOENT'
-            ? new Error('No encontré el CLI de Claude Code. Instálalo o configura kato.agent.cliPath.')
+            ? new Error(CLAUDE_MISSING)
             : err,
         );
       });

@@ -97,7 +97,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = new KatoStatusBar();
   const agents = new AgentManager(
     {
-      'claude-code': new ClaudeCodeSessionProvider(log),
+      'claude-code': new ClaudeCodeSessionProvider(log, () => getConfig().agentCliPath),
       codex: new CodexSessionProvider(log),
     },
     () => ({ provider: getConfig().agentProvider, model: getConfig().agentModel }),
