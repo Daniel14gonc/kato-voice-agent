@@ -44,6 +44,6 @@ export function resolveCodexCli(): string | undefined {
 }
 
 export const CLAUDE_MISSING =
-  'No encontré Claude Code. Instálalo (npm i -g @anthropic-ai/claude-code), corre "claude" una vez para iniciar sesión, ' +
-  'o configura kato.agent.cliPath.';
-export const CODEX_MISSING = 'No encontré Codex. Instálalo (npm i -g @openai/codex) y corre "codex login".';
+  "Couldn't find Claude Code. Install it (npm i -g @anthropic-ai/claude-code) and run \"claude\" once to sign in, " +
+  'or set kato.agent.cliPath.';
+export const CODEX_MISSING = "Couldn't find Codex. Install it (npm i -g @openai/codex) and run \"codex login\".";

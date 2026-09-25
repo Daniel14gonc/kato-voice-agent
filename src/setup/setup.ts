@@ -74,7 +74,7 @@ export interface AgentDetection {
 }
 
 /** Best-effort: good enough to pick a default and to explain what is missing. */
-export function detectAgents(es = true): AgentDetection[] {
+export function detectAgents(): AgentDetection[] {
   const home = os.homedir();
   const claudeCli = findBinary('claude', [path.join(home, '.claude', 'local')]);
   let claudeLoggedIn = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -95,12 +95,8 @@ export function detectAgents(es = true): AgentDetection[] {
       hint: claudeLoggedIn
         ? ''
         : claudeCli
-          ? es
-            ? 'Corre "claude" en una terminal una vez para iniciar sesión.'
-            : 'Run "claude" in a terminal once to sign in.'
-          : es
-            ? 'Instala Claude Code (npm i -g @anthropic-ai/claude-code) y corre "claude" para iniciar sesión.'
-            : 'Install Claude Code (npm i -g @anthropic-ai/claude-code) and run "claude" to sign in.',
+          ? 'Run "claude" in a terminal once to sign in.'
+          : 'Install Claude Code (npm i -g @anthropic-ai/claude-code) and run "claude" to sign in.',
     },
     {
       id: 'codex',
@@ -109,38 +105,32 @@ export function detectAgents(es = true): AgentDetection[] {
       hint: codexLoggedIn
         ? ''
         : codexCli
-          ? es
-            ? 'Corre "codex login" en una terminal.'
-            : 'Run "codex login" in a terminal.'
-          : es
-            ? 'Instala Codex (npm i -g @openai/codex) y corre "codex login".'
-            : 'Install Codex (npm i -g @openai/codex) and run "codex login".',
+          ? 'Run "codex login" in a terminal.'
+          : 'Install Codex (npm i -g @openai/codex) and run "codex login".',
     },
   ];
 }
 
-export async function checkSetup(secrets: vscode.SecretStorage, es = true): Promise<SetupItem[]> {
+export async function checkSetup(secrets: vscode.SecretStorage): Promise<SetupItem[]> {
   const keys = await keyPresence(secrets);
   const config = getConfig();
   const items: SetupItem[] = [];
 
   items.push({
-    label: es ? 'Micrófono (ffmpeg)' : 'Microphone (ffmpeg)',
+    label: 'Microphone (ffmpeg)',
     ok: Boolean(findBinary('ffmpeg')),
-    hint: es ? 'Instálalo con: brew install ffmpeg' : 'Install it with: brew install ffmpeg',
+    hint: 'Install it with: brew install ffmpeg',
   });
   items.push({
-    label: es ? 'API key de OpenAI' : 'OpenAI API key',
+    label: 'OpenAI API key',
     ok: keys.openai,
-    hint: es
-      ? 'La usa el router de intenciones y las respuestas habladas.'
-      : 'Kato uses it to understand requests and to answer.',
+    hint: 'Kato uses it to understand requests and to answer.',
   });
 
   const voice = effectiveVoiceProviders(keys);
   for (const [kind, configured, effective] of [
-    [es ? 'Transcripción' : 'Transcription', config.sttProvider, voice.stt],
-    [es ? 'Voz' : 'Voice', config.ttsProvider, voice.tts],
+    ['Transcription', config.sttProvider, voice.stt],
+    ['Voice', config.ttsProvider, voice.tts],
   ] as const) {
     if (configured === 'openai') {
       continue;
@@ -149,18 +139,15 @@ export async function checkSetup(secrets: vscode.SecretStorage, es = true): Prom
       label: `${kind}: ${PROVIDER_NAMES[configured] ?? configured}`,
       ok: configured === effective,
       optional: true,
-      hint: es
-        ? `Falta la key de ${PROVIDER_NAMES[configured] ?? configured}; mientras tanto uso OpenAI.`
-        : `No ${PROVIDER_NAMES[configured] ?? configured} key yet; using OpenAI meanwhile.`,
+      hint: `No ${PROVIDER_NAMES[configured] ?? configured} key yet; using OpenAI meanwhile.`,
     });
   }
 
-  const agent = detectAgents(es).find((candidate) => candidate.id === config.agentProvider);
+  const agent = detectAgents().find((candidate) => candidate.id === config.agentProvider);
   items.push({
-    label: `${es ? 'Agente de código' : 'Coding agent'}: ${PROVIDER_NAMES[config.agentProvider] ?? config.agentProvider}`,
+    label: `Coding agent: ${PROVIDER_NAMES[config.agentProvider] ?? config.agentProvider}`,
     ok: agent ? agent.loggedIn : false,
-    hint:
-      agent?.hint || (es ? 'Proveedor desconocido: revisa kato.agent.provider.' : 'Unknown provider: check kato.agent.provider.'),
+    hint: agent?.hint || 'Unknown provider: check kato.agent.provider.',
   });
   return items;
 }
@@ -211,8 +198,8 @@ export async function promptForKey(
   let error = '';
   for (;;) {
     const key = await vscode.window.showInputBox({
-      title: `Kato${step ? ` (${step})` : ''}: API key de ${info.title}`,
-      prompt: `${error ? `${error} ` : ''}${why} Consíguela en ${info.url}. Se guarda en el SecretStorage de VS Code.`,
+      title: `Kato${step ? ` (${step})` : ''}: ${info.title} API key`,
+      prompt: `${error ? `${error} ` : ''}${why} Get one at ${info.url}. It's stored in VS Code's secret storage.`,
       password: true,
       ignoreFocusOut: true,
       placeHolder: info.placeholder,
@@ -222,16 +209,16 @@ export async function promptForKey(
     }
     const trimmed = key.trim();
     const result = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Kato: verificando la key de ${info.title}…` },
+      { location: vscode.ProgressLocation.Notification, title: `Kato: checking the ${info.title} key…` },
       () => validateKey(provider, trimmed),
     );
     if (result === 'invalid') {
-      error = `${info.title} rechazó esa key.`;
+      error = `${info.title} rejected that key.`;
       continue;
     }
     await secrets.store(SECRET_KEYS[provider], trimmed);
     if (result === 'unknown') {
-      void vscode.window.showWarningMessage(`Kato: guardé la key de ${info.title}, pero no pude verificarla ahora.`);
+      void vscode.window.showWarningMessage(`Kato: saved the ${info.title} key, but couldn't verify it right now.`);
     }
     return true;
   }
@@ -258,32 +245,32 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
   const cfg = vscode.workspace.getConfiguration('kato');
   const keys = await keyPresence(secrets);
   const set = (key: string, value: unknown) => cfg.update(key, value, vscode.ConfigurationTarget.Global);
-  const tick = (ok: boolean) => (ok ? '$(check) key guardada' : '');
+  const tick = (ok: boolean) => (ok ? '$(check) key saved' : '');
 
   // 1. Voice stack.
   const stack = await pickOne<'openai' | 'assemblyai' | 'soniox'>(
-    'Kato (1/4): ¿con qué quieres que escuche y hable?',
+    'Kato (1/4): how should Kato listen and speak?',
     [
       {
-        label: 'AssemblyAI para escuchar + OpenAI (recomendado)',
+        label: 'AssemblyAI to listen + OpenAI (recommended)',
         description: tick(keys.assemblyai),
-        detail: 'Universal-3.5 Pro en streaming: entiende el spanglish técnico y los nombres de tu código. Dos keys.',
+        detail: 'Universal-3.5 Pro streaming: handles technical English/Spanish and the names in your code. Two keys.',
         value: 'assemblyai',
       },
       {
-        label: 'Solo OpenAI',
+        label: 'OpenAI only',
         description: tick(keys.openai),
-        detail: 'Una sola API key. Lo más simple para empezar.',
+        detail: 'A single API key. The simplest way to start.',
         value: 'openai',
       },
       {
-        label: 'Soniox para escuchar y hablar + OpenAI',
+        label: 'Soniox to listen and speak + OpenAI',
         description: tick(keys.soniox),
-        detail: 'La latencia más baja y voces de Soniox. Dos keys.',
+        detail: 'The lowest latency, with Soniox voices. Two keys.',
         value: 'soniox',
       },
     ],
-    'OpenAI siempre hace falta: con ella Kato entiende qué le pides.',
+    'OpenAI is always needed: Kato uses it to understand what you ask.',
   );
   if (!stack) {
     return false;
@@ -291,15 +278,15 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
 
   // 2. Keys — only the missing ones.
   if (!keys.openai) {
-    const ok = await promptForKey(secrets, 'openai', 'Kato la usa para entender lo que pides y responderte.', '2/4');
+    const ok = await promptForKey(secrets, 'openai', 'Kato uses it to understand what you ask and to answer.', '2/4');
     if (!ok) {
       return false;
     }
   }
   if (stack !== 'openai' && !keys[stack]) {
-    const ok = await promptForKey(secrets, stack, 'Para la voz de Kato.', '2/4');
+    const ok = await promptForKey(secrets, stack, "For Kato's voice.", '2/4');
     if (!ok) {
-      void vscode.window.showInformationMessage(`Kato: sin key de ${PROVIDER_NAMES[stack]}, uso OpenAI para la voz.`);
+      void vscode.window.showInformationMessage(`Kato: no ${PROVIDER_NAMES[stack]} key, so OpenAI handles the voice.`);
     }
   }
   await set('stt.provider', stack);
@@ -317,16 +304,16 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
   const agents = detectAgents();
   const current = getConfig().agentProvider;
   const agentPick = await pickOne<'claude-code' | 'codex'>(
-    'Kato (3/4): ¿qué agente de código hace el trabajo?',
+    'Kato (3/4): which coding agent does the work?',
     agents
       .map((agent) => ({
         label: PROVIDER_NAMES[agent.id],
-        description: agent.loggedIn ? '$(check) listo' : agent.installed ? 'falta iniciar sesión' : 'no instalado',
-        detail: agent.hint || (agent.id === current ? 'El que usas ahora.' : undefined),
+        description: agent.loggedIn ? '$(check) ready' : agent.installed ? 'not signed in' : 'not installed',
+        detail: agent.hint || (agent.id === current ? 'The one you use now.' : undefined),
         value: agent.id,
       }))
       .sort((a, b) => Number(b.description.startsWith('$(check)')) - Number(a.description.startsWith('$(check)'))),
-    'Kato nunca escribe código: delega en este agente.',
+    'Kato never writes code itself: it hands the work to this agent.',
   );
   if (!agentPick) {
     return false;
@@ -335,10 +322,10 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
   const chosen = agents.find((agent) => agent.id === agentPick);
   if (chosen && !chosen.loggedIn) {
     const action = await vscode.window.showWarningMessage(
-      `Kato: ${PROVIDER_NAMES[agentPick]} todavía no está listo. ${chosen.hint}`,
-      'Abrir terminal',
+      `Kato: ${PROVIDER_NAMES[agentPick]} isn't ready yet. ${chosen.hint}`,
+      'Open terminal',
     );
-    if (action === 'Abrir terminal') {
+    if (action === 'Open terminal') {
       const terminal = vscode.window.createTerminal('Kato setup');
       terminal.show();
       terminal.sendText(agentPick === 'codex' ? 'codex login' : 'claude', false);
@@ -347,26 +334,26 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
 
   // 4. Permission level.
   const mode = await pickOne<string>(
-    'Kato (4/4): ¿cuánto puede hacer el agente sin preguntarte?',
+    'Kato (4/4): how much may the agent do without asking?',
     [
       {
         label: 'Normal',
-        description: '(recomendado)',
-        detail: 'Edita archivos solo. Te pregunta antes de correr comandos que cambian cosas; los de solo lectura nunca.',
+        description: '(recommended)',
+        detail: 'Edits files freely. Asks before commands that change things; read-only ones never ask.',
         value: 'agent',
       },
       {
-        label: 'Automático',
-        detail: 'Nunca te pregunta. Ves cada acción en el panel y puedes decir "detente" cuando quieras.',
+        label: 'Auto',
+        detail: 'Never asks. Every action shows in the panel, and you can say "stop" at any time.',
         value: 'auto',
       },
       {
         label: 'Manual',
-        detail: 'Te pregunta por voz antes de cada acción, ediciones incluidas.',
+        detail: 'Asks by voice before every action, edits included.',
         value: 'ask',
       },
     ],
-    'Lo puedes cambiar después por voz: "ponlo en automático", "modo normal".',
+    'You can change it later by voice: "put it on auto", "normal mode".',
   );
   if (mode) {
     await set('agent.defaultMode', mode);

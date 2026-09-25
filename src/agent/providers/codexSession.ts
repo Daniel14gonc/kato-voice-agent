@@ -319,7 +319,7 @@ export class CodexExploreAgent implements AgentProvider {
       throw new Error(codexError(err));
     }
     if (!finalText) {
-      throw new Error('Codex no devolvió respuesta.');
+      throw new Error('Codex returned no answer.');
     }
     return finalText;
   }

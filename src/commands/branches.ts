@@ -75,7 +75,7 @@ export class BranchService {
         confirm: {
           description: `stash the uncommitted changes and switch to branch "${match.name}"`,
           run: async () => {
-            await git(cwd, ['stash', 'push', '--include-untracked', '-m', `kato: antes de cambiar a ${match.name}`]);
+            await git(cwd, ['stash', 'push', '--include-untracked', '-m', `kato: before switching to ${match.name}`]);
             await git(cwd, ['switch', match.name]);
             return es
               ? `Listo: guardé tus cambios y estás en ${match.name}. Cuando quieras, di "recupera mis cambios".`
@@ -203,7 +203,7 @@ export class BranchService {
     if (!(await isDirty(cwd))) {
       return { speech: es ? 'No tienes cambios que guardar.' : 'You have no changes to set aside.' };
     }
-    await git(cwd, ['stash', 'push', '--include-untracked', '-m', 'kato: guardado por voz']);
+    await git(cwd, ['stash', 'push', '--include-untracked', '-m', 'kato: stashed by voice']);
     return {
       speech: es
         ? 'Guardé tus cambios aparte. Di "recupera mis cambios" para traerlos de vuelta.'

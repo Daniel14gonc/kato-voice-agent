@@ -101,7 +101,7 @@ export class DeepUnderstanding {
     // Cap the exploration so a stuck agent can't hold the pipeline forever.
     const combined = new AbortController();
     const timer = setTimeout(
-      () => combined.abort(new Error('La exploración excedió 4 minutos')),
+      () => combined.abort(new Error('The exploration took longer than 4 minutes')),
       EXPLORE_TIMEOUT_MS,
     );
     const forward = () => combined.abort();
@@ -220,7 +220,7 @@ export class DeepUnderstanding {
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
     if (start === -1 || end <= start) {
-      throw new Error(`El agente no devolvió JSON: ${raw.slice(0, 200)}`);
+      throw new Error(`The agent did not return JSON: ${raw.slice(0, 200)}`);
     }
     let parsed: { overview?: unknown; stops?: unknown };
     try {

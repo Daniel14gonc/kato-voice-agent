@@ -90,7 +90,7 @@ export class VoicePipeline {
         // user's click, so this is a nudge — the turn stays alive.
         this.channel.appendLine(`[playback error] ${message}`);
         void vscode.window.showWarningMessage(
-          'Kato: haz click en el panel de Kato para habilitar el audio — la respuesta sonará al hacerlo.',
+          "Kato: click the Kato panel to enable audio — the answer will play when you do.",
         );
       },
       onDiag: (message) => {
@@ -354,7 +354,7 @@ export class VoicePipeline {
         onLevel: (rms) => this.bridge.showLevel(rms),
         onError: (message) => {
           this.channel.appendLine(`[mic error] ${message}`);
-          void vscode.window.showErrorMessage(`Kato: problema con el micrófono — ${message}`);
+          void vscode.window.showErrorMessage(`Kato: microphone problem — ${message}`);
           this.toIdle();
         },
       },
@@ -387,9 +387,6 @@ export class VoicePipeline {
   private async respond(transcript: string, language?: string): Promise<void> {
     const config = getConfig();
     language = this.stickyLanguage(transcript, language);
-    if (language) {
-      this.bridge.setLanguage(language);
-    }
     this.channel.appendLine(`You: ${transcript}${language ? ` [${language}]` : ''}`);
     const abort = new AbortController();
     this.abort = abort;

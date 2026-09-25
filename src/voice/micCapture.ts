@@ -116,7 +116,7 @@ export class MicCapture {
     proc.on('error', (err: NodeJS.ErrnoException) => {
       this.proc = undefined;
       if (err.code === 'ENOENT') {
-        events.onError('ffmpeg no está instalado. Instálalo con: brew install ffmpeg');
+        events.onError('ffmpeg is not installed. Install it with: brew install ffmpeg');
       } else {
         events.onError(err.message);
       }
@@ -133,7 +133,7 @@ export class MicCapture {
         void this.fallbackToRealMic(events, stderr);
         return;
       }
-      events.onError(`ffmpeg terminó con código ${code}: ${stderr.trim().slice(0, 300)}`);
+      events.onError(`ffmpeg exited with code ${code}: ${stderr.trim().slice(0, 300)}`);
     });
   }
 
@@ -153,8 +153,8 @@ export class MicCapture {
       /* fall through to error below */
     }
     events.onError(
-      `no encontré un micrófono utilizable (${previousError.trim().slice(0, 200)}). ` +
-        'Puedes fijar el dispositivo con el setting kato.mic.device.',
+      `couldn't find a usable microphone (${previousError.trim().slice(0, 200)}). ` +
+        'You can pick the device with the kato.mic.device setting.',
     );
   }
 

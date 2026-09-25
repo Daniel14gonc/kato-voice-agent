@@ -64,12 +64,10 @@ export function activate(context: vscode.ExtensionContext): void {
   let keys: KeyPresence = { openai: false, soniox: false, assemblyai: false, anthropic: false };
   const voiceProviders = () => effectiveVoiceProviders(keys);
   bridge.setZoom(getConfig().panelZoom);
-  bridge.setLanguage(vscode.env.language.startsWith('es') ? 'es' : 'en');
   const refreshSetup = async () => {
     keys = await keyPresence(context.secrets);
-    bridge.setupStatus(await checkSetup(context.secrets, bridge.language === 'es'));
+    bridge.setupStatus(await checkSetup(context.secrets));
   };
-  bridge.onLanguageChange(() => void refreshSetup());
 
   const mic = new MicCapture();
   const stt = new SttRouter(
@@ -194,7 +192,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const done = await runSetupWizard(context.secrets);
     await refreshSetup();
     if (done) {
-      void vscode.window.showInformationMessage('Kato está listo. Pulsa Ctrl+; y pídeme algo.');
+      void vscode.window.showInformationMessage('Kato is ready. Press Ctrl+; and ask for something.');
     }
     return done;
   };
@@ -230,7 +228,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (config.ttsProvider === 'soniox') {
           const sonioxKey = await getSonioxKey(context);
           if (!sonioxKey) {
-            void vscode.window.showWarningMessage('Kato: configura primero la API key de Soniox.');
+            void vscode.window.showWarningMessage('Kato: set the Soniox API key first.');
             return;
           }
           voices = await listSonioxVoices(sonioxKey, config.ttsSonioxModel);
@@ -238,11 +236,11 @@ export function activate(context: vscode.ExtensionContext): void {
           voices = OPENAI_VOICES;
         }
       } catch (err) {
-        void vscode.window.showErrorMessage(`Kato: no pude leer el catálogo de voces — ${String(err)}`);
+        void vscode.window.showErrorMessage(`Kato: couldn't read the voice catalog — ${String(err)}`);
         return;
       }
       if (voices.length === 0) {
-        void vscode.window.showWarningMessage('Kato: el proveedor no devolvió voces.');
+        void vscode.window.showWarningMessage('Kato: the provider returned no voices.');
         return;
       }
       const picked = await vscode.window.showQuickPick(
@@ -253,8 +251,8 @@ export function activate(context: vscode.ExtensionContext): void {
           picked: voice.id === config.ttsVoice,
         })),
         {
-          title: 'Kato: elige una voz',
-          placeHolder: 'Escribe "male" o "female" para filtrar por género',
+          title: 'Kato: choose a voice',
+          placeHolder: 'Type "male" or "female" to filter by gender',
           matchOnDescription: true,
           matchOnDetail: true,
         },
@@ -267,20 +265,20 @@ export function activate(context: vscode.ExtensionContext): void {
         .update('tts.voice', picked.label, vscode.ConfigurationTarget.Global);
       // Audition it right away: reading it aloud is the only real test.
       pipeline.speakNotification(
-        `Hola, soy ${picked.label}. Así sueno leyendo tu código y explicándote lo que hace.`,
-        'es',
+        `Hi, I'm ${picked.label}. This is how I sound reading your code and explaining what it does.`,
+        'en',
       );
     }),
     vscode.commands.registerCommand('kato.configureApiKeys', async () => {
       // One key at a time, chosen from a list that says what each one is for.
       const picked = await vscode.window.showQuickPick(
         [
-          { label: 'OpenAI', detail: 'Obligatoria: router de intenciones, respuestas y voz por defecto.', value: 'openai' as KeyProvider, description: keys.openai ? '$(check) guardada' : '' },
-          { label: 'AssemblyAI', detail: 'Transcripción (kato.stt.provider = assemblyai).', value: 'assemblyai' as KeyProvider, description: keys.assemblyai ? '$(check) guardada' : '' },
-          { label: 'Soniox', detail: 'Transcripción y voz (kato.stt/tts.provider = soniox).', value: 'soniox' as KeyProvider, description: keys.soniox ? '$(check) guardada' : '' },
-          { label: 'Anthropic', detail: 'Respuestas habladas con Claude (kato.llm.provider = anthropic).', value: 'anthropic' as KeyProvider, description: keys.anthropic ? '$(check) guardada' : '' },
+          { label: 'OpenAI', detail: 'Required: understanding requests, answers and the fallback voice.', value: 'openai' as KeyProvider, description: keys.openai ? '$(check) saved' : '' },
+          { label: 'AssemblyAI', detail: 'Transcription (kato.stt.provider = assemblyai).', value: 'assemblyai' as KeyProvider, description: keys.assemblyai ? '$(check) saved' : '' },
+          { label: 'Soniox', detail: 'Transcription and voice (kato.stt/tts.provider = soniox).', value: 'soniox' as KeyProvider, description: keys.soniox ? '$(check) saved' : '' },
+          { label: 'Anthropic', detail: 'Spoken answers with Claude (kato.llm.provider = anthropic).', value: 'anthropic' as KeyProvider, description: keys.anthropic ? '$(check) saved' : '' },
         ],
-        { title: 'Kato: ¿qué API key quieres configurar?' },
+        { title: 'Kato: which API key do you want to set?' },
       );
       if (picked) {
         await promptForKey(context.secrets, picked.value, '');
@@ -291,7 +289,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('kato.evalRouter', async () => {
       const key = await getKey();
       if (!key) {
-        void vscode.window.showWarningMessage('Kato: configura primero la API key de OpenAI.');
+        void vscode.window.showWarningMessage('Kato: set the OpenAI API key first.');
         return;
       }
       const evalOutput = vscode.window.createOutputChannel('Kato Eval');
@@ -308,11 +306,11 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('kato.forgetTestCommand', async () => {
       await tests.forgetCommand();
-      void vscode.window.showInformationMessage('Kato: olvidé el comando de tests; te lo preguntaré la próxima vez.');
+      void vscode.window.showInformationMessage("Kato: forgot the test command; I'll ask for it next time.");
     }),
     vscode.commands.registerCommand('kato.clearRepoNotes', async () => {
       await deep.clearNotes();
-      void vscode.window.showInformationMessage('Kato: notas del repo olvidadas. La próxima exploración parte de cero.');
+      void vscode.window.showInformationMessage('Kato: repo notes cleared. The next exploration starts from scratch.');
     }),
     { dispose: () => debugCtl.dispose() },
     { dispose: () => pipeline.dispose() },
@@ -333,7 +331,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!keys.openai && !context.globalState.get('kato.setupPrompted')) {
       void context.globalState.update('kato.setupPrompted', true);
       void vscode.window
-        .showInformationMessage('Kato: configúralo en un minuto (voz, API keys y agente de código).', 'Configurar')
+        .showInformationMessage('Kato: set it up in a minute (voice, API keys and coding agent).', 'Set up')
         .then((choice) => (choice ? setup() : undefined));
     }
   });

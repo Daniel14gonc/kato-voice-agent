@@ -79,7 +79,7 @@ export class SonioxStt implements SttProvider {
   private async openSocket(options: SttSessionOptions): Promise<void> {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
-      throw new Error('Missing Soniox API key (run "Kato: Configure API Keys")');
+      throw new Error('Missing Soniox API key (run "Kato: Set an API Key…")');
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -106,7 +106,7 @@ export class SonioxStt implements SttProvider {
         if (this.ws === ws) {
           this.ws = undefined;
         }
-        settle(new Error('Soniox no respondió al handshake'));
+        settle(new Error('Soniox did not answer the handshake'));
       }, HANDSHAKE_TIMEOUT_MS);
       timeout.unref?.();
       // close() during the handshake has to fail this promise, or the awaiting
@@ -262,13 +262,13 @@ export class SonioxStt implements SttProvider {
 function describeError(code: number, message?: string): string {
   if (code === 429) {
     return (
-      'Soniox 429: se superó el límite de transcripciones en tiempo real simultáneas de tu organización. ' +
-      'Si no hay otra app usándolo, son sesiones de Kato que quedaron colgadas: recarga la ventana ' +
-      '(Developer: Reload Window) y vuelve a intentarlo, o cambia kato.stt.provider a openai mientras tanto.'
+      "Soniox 429: your organization hit its limit of concurrent real-time transcriptions. " +
+      "If no other app is using it, these are Kato sessions left hanging: reload the window " +
+      '(Developer: Reload Window) and try again, or switch kato.stt.provider to openai meanwhile.'
     );
   }
   if (code === 401 || code === 403) {
-    return `Soniox ${code}: la API key no es válida. Vuelve a configurarla con "Kato: Configure API Keys".`;
+    return `Soniox ${code}: the API key is invalid. Set it again with "Kato: Set an API Key…".`;
   }
   return `Soniox ${code}: ${message ?? 'unknown error'}`;
 }

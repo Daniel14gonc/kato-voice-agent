@@ -13,7 +13,7 @@ export class SonioxTts implements TtsProvider {
   async speak(text: string, options: TtsSpeakOptions): Promise<void> {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
-      throw new Error('Missing Soniox API key (run "Kato: Configure API Keys")');
+      throw new Error('Missing Soniox API key (run "Kato: Set an API Key…")');
     }
     const response = await fetch(SONIOX_TTS_URL, {
       method: 'POST',

@@ -34,69 +34,29 @@
   const agentAskTitleEl = document.getElementById('agent-ask-title');
   const agentAskDetailEl = document.getElementById('agent-ask-detail');
   const agentAskHintEl = document.getElementById('agent-ask-hint');
-  const emptyTitleEl = document.querySelector('#empty .empty-title');
-
-  // The panel speaks the language of the conversation: the extension sends
-  // 'lang' with VS Code's display language first, then whatever the user talks in.
-  const STRINGS = {
-    en: {
-      status: { idle: 'Idle — Ctrl+; to talk', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' },
-      agentState: {
-        starting: 'starting…',
-        working: 'working',
-        exploring: 'exploring the code',
-        waiting_approval: 'waiting for your OK',
-        ready: 'done',
-        closed: 'closed',
-        idle: '',
-      },
-      agent: 'Agent',
-      actions: (n) => n + (n === 1 ? ' action' : ' actions'),
-      activity: 'Activity',
-      seeOutput: '(click: see the output)',
-      askTitle: (what) => 'Let it ' + what + '?',
-      askHint: 'Ctrl+; and say "yes", "no", or "yes to all" so it stops asking.',
-      pasted: (n) => n + (n === 1 ? ' line pasted' : ' lines pasted'),
-      placeholder: 'Type or paste here… (Enter sends, Esc closes)',
-      pasteValue: 'Paste the value here…',
-      emptyTitle: 'Press <b>Ctrl+;</b> and talk',
-      hint: '<kbd>Ctrl+;</kbd> talk · <kbd>Ctrl+Shift+;</kbd> type or paste',
-      unlock: '🔊 Click to enable audio',
-      clear: 'Clear',
-      send: 'Send',
-      setup: 'Set up Kato',
-      examples: 'Try: “give me a tour of this repo” · “take me to the main function” · “add validation to the login form”',
+  // Fixed UI text is always English; only what Kato says follows the user's language.
+  const T = {
+    status: { idle: 'Idle — Ctrl+; to talk', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' },
+    agentState: {
+      starting: 'starting…',
+      working: 'working',
+      exploring: 'exploring the code',
+      waiting_approval: 'waiting for your OK',
+      ready: 'done',
+      closed: 'closed',
+      idle: '',
     },
-    es: {
-      status: { idle: 'En espera — Ctrl+; para hablar', listening: 'Escuchando…', thinking: 'Pensando…', speaking: 'Hablando…' },
-      agentState: {
-        starting: 'arrancando…',
-        working: 'trabajando',
-        exploring: 'explorando el código',
-        waiting_approval: 'espera tu OK',
-        ready: 'terminó',
-        closed: 'cerrado',
-        idle: '',
-      },
-      agent: 'Agente',
-      actions: (n) => n + (n === 1 ? ' acción' : ' acciones'),
-      activity: 'Actividad',
-      seeOutput: '(click: ver la salida)',
-      askTitle: (what) => '¿Le doy permiso para ' + what + '?',
-      askHint: 'Ctrl+; y di "sí", "no", o "sí a todo" para que no vuelva a preguntar.',
-      pasted: (n) => n + (n === 1 ? ' línea pegada' : ' líneas pegadas'),
-      placeholder: 'Escribe o pega aquí… (Enter envía, Esc cierra)',
-      pasteValue: 'Pega el valor aquí…',
-      emptyTitle: 'Pulsa <b>Ctrl+;</b> y habla',
-      hint: '<kbd>Ctrl+;</kbd> hablar · <kbd>Ctrl+Shift+;</kbd> escribir o pegar',
-      unlock: '🔊 Click para habilitar el audio',
-      clear: 'Limpiar',
-      send: 'Enviar',
-      setup: 'Configurar Kato',
-      examples: 'Prueba: «dame un tour por este repo» · «llévame a la función main» · «agrega validación al formulario de login»',
-    },
+    actions: (n) => n + (n === 1 ? ' action' : ' actions'),
+    activity: 'Activity',
+    seeOutput: '(click: see the output)',
+    askTitle: (what) => 'Let it ' + what + '?',
+    askHint: 'Ctrl+; and say "yes", "no", or "yes to all" so it stops asking.',
+    pasted: (n) => n + (n === 1 ? ' line pasted' : ' lines pasted'),
+    placeholder: 'Type or paste here… (Enter sends, Esc closes)',
+    pasteValue: 'Paste the value here…',
+    setup: 'Set up Kato',
+    examples: 'Try: “give me a tour of this repo” · “take me to the main function” · “add validation to the login form”',
   };
-  let T = STRINGS.en;
 
   const SAMPLE_RATE = 24000;
   const MAX_TURNS = 120;
@@ -616,10 +576,7 @@
     agentLogSummaryEl.textContent = T.activity + (agentRows.size ? ' (' + agentRows.size + ')' : '');
   }
 
-  let agentPermission = null;
-
   function renderAgentPermission(request) {
-    agentPermission = request;
     if (!request) {
       agentAskEl.classList.remove('open');
       agentAskDetailEl.textContent = '';
@@ -694,33 +651,6 @@
     }
   }
 
-  let panelState = 'idle';
-
-  /** Re-renders every piece of fixed text after a language change. */
-  function applyLanguage(lang) {
-    T = STRINGS[lang] || STRINGS.en;
-    document.documentElement.lang = lang;
-    statusEl.textContent = T.status[panelState] || panelState;
-    if (emptyTitleEl) {
-      emptyTitleEl.innerHTML = T.emptyTitle;
-    }
-    hintEl.innerHTML = T.hint;
-    unlockEl.textContent = T.unlock;
-    clearEl.textContent = T.clear;
-    sendEl.textContent = T.send;
-    if (!composerEl.classList.contains('awaiting')) {
-      inputEl.placeholder = T.placeholder;
-    }
-    renderLogSummary();
-    if (agentStatus) {
-      renderAgentStatus(agentStatus);
-    } else {
-      agentNameEl.textContent = T.agent;
-    }
-    if (agentPermission) {
-      renderAgentPermission(agentPermission);
-    }
-  }
 
   window.addEventListener('message', (event) => {
     const msg = event.data;
@@ -756,7 +686,6 @@
         vuEl.style.width = Math.min(100, Math.round(msg.value * 300)) + '%';
         break;
       case 'status':
-        panelState = msg.state;
         statusEl.textContent = T.status[msg.state] || msg.state;
         statusEl.dataset.state = msg.state;
         headerEl.dataset.state = msg.state;
@@ -788,16 +717,12 @@
       case 'setupStatus':
         renderSetup(msg.items);
         break;
-      case 'lang':
-        applyLanguage(msg.value);
-        break;
       case 'zoom':
         document.body.style.zoom = String(Math.min(2, Math.max(0.7, Number(msg.value) || 1)));
         break;
     }
   });
 
-  applyLanguage('en');
   post({ type: 'ready' });
   diag('webview loaded');
 })();

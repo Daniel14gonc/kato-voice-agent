@@ -67,14 +67,14 @@ export class KatoStatusBar {
     this.agentItem.backgroundColor = undefined;
     switch (agent.state) {
       case 'waiting_approval':
-        this.agentItem.text = `$(bell-dot) ${agent.provider} espera tu OK`;
+        this.agentItem.text = `$(bell-dot) ${agent.provider} needs your OK`;
         this.agentItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
         break;
       case 'ready':
-        this.agentItem.text = `$(check) ${agent.provider} terminó · ${elapsed}`;
+        this.agentItem.text = `$(check) ${agent.provider} done · ${elapsed}`;
         break;
       case 'exploring':
-        this.agentItem.text = `$(sync~spin) ${agent.provider} explorando · ${elapsed}`;
+        this.agentItem.text = `$(sync~spin) ${agent.provider} exploring · ${elapsed}`;
         break;
       default:
         this.agentItem.text = `$(sync~spin) ${agent.provider}${steps} · ${elapsed}`;
@@ -83,8 +83,8 @@ export class KatoStatusBar {
       [
         `**${agent.provider}** — ${agent.modeLabel}`,
         agent.task ? `\n\n${agent.task.slice(0, 200)}` : '',
-        agent.currentStep ? `\n\nAhora: ${agent.currentStep}` : '',
-        '\n\n_Click para abrir el panel de Kato_',
+        agent.currentStep ? `\n\nNow: ${agent.currentStep}` : '',
+        '\n\n_Click to open the Kato panel_',
       ].join(''),
     );
     this.agentItem.show();

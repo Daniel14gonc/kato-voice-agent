@@ -193,8 +193,8 @@ export class TestRunner {
       return detected;
     }
     const asked = await vscode.window.showInputBox({
-      title: 'Kato: comando de tests',
-      prompt: 'No detecté cómo correr los tests de este proyecto. ¿Cuál es el comando?',
+      title: 'Kato: test command',
+      prompt: "I couldn't tell how to run this project's tests. What's the command?",
       placeHolder: 'npm test / pytest / cargo test …',
       ignoreFocusOut: true,
     });

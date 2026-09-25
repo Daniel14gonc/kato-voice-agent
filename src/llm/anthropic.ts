@@ -7,7 +7,7 @@ export class AnthropicLlm implements LlmProvider {
   async streamChat(options: StreamChatOptions): Promise<string> {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
-      throw new Error('Missing Anthropic API key (run "Kato: Configure API Keys")');
+      throw new Error('Missing Anthropic API key (run "Kato: Set an API Key…")');
     }
     const client = new Anthropic({ apiKey });
 

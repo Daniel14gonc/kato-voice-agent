@@ -75,7 +75,7 @@ export class Debrief {
         if (status.length > 0) {
           const names = status.slice(0, 6).map((l) => l.slice(3).split('/').pop());
           facts.push(`Repo ${name}: ${status.length} uncommitted file(s) right now: ${names.join(', ')}`);
-          lines.push(`${name}: ${status.length} sin commitear`);
+          lines.push(`${name}: ${status.length} uncommitted`);
         }
       }
     }
@@ -91,7 +91,7 @@ export class Debrief {
             .map((t) => `  - ${t.ok ? 'done' : 'FAILED'} in ${Math.round(t.seconds / 60)} min: "${t.task.slice(0, 160)}" → ${t.summary.slice(0, 200)}`)
             .join('\n'),
       );
-      lines.push(`${es ? 'Agente' : 'Agent'}: ${tasks.length} ${es ? 'tarea' : 'task'}${tasks.length === 1 ? '' : 's'}`);
+      lines.push(`Agent: ${tasks.length} task${tasks.length === 1 ? '' : 's'}`);
     }
 
     const prs = await this.github.activitySince(start);

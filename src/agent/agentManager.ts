@@ -263,7 +263,7 @@ export class AgentManager {
         provider: this.exploration.provider,
         state: 'exploring',
         mode: 'plan',
-        modeLabel: this.lastLanguageEs ? 'solo lectura' : 'read-only',
+        modeLabel: 'read-only',
         task: this.exploration.question,
         toolCount: this.exploration.toolCount,
         startedAt: this.exploration.startedAt,
@@ -278,7 +278,7 @@ export class AgentManager {
       provider: this.providerLabel(),
       state,
       mode: this.currentMode(),
-      modeLabel: this.modeLabel(this.lastLanguageEs),
+      modeLabel: this.modeLabel(false),
       task: this.tracker.task,
       toolCount: this.tracker.toolCount,
       startedAt: this.tracker.startedAt || undefined,
@@ -443,7 +443,7 @@ export class AgentManager {
     this.exploration = { question, provider: label, startedAt: Date.now(), toolCount: 0 };
     this.ui.reveal();
     this.ui.todos([]);
-    this.ui.milestone(`▶ ${label} (${es ? 'explorando' : 'exploring'}): ${question}`);
+    this.ui.milestone(`▶ ${label} (exploring): ${question}`);
     this.pushStatus();
   }
 
@@ -452,8 +452,7 @@ export class AgentManager {
       return;
     }
     this.exploration.toolCount++;
-    const label = say(activity.label, this.lastLanguageEs);
-    this.ui.tool({ id: `explore:${activity.id}`, label, detail: activity.detail, state: 'ok' });
+    this.ui.tool({ id: `explore:${activity.id}`, label: say(activity.label, false), detail: activity.detail, state: 'ok' });
     this.pushStatus();
   }
 
@@ -463,13 +462,7 @@ export class AgentManager {
     }
     const seconds = Math.round((Date.now() - this.exploration.startedAt) / 1000);
     this.ui.milestone(
-      ok
-        ? this.lastLanguageEs
-          ? `✓ Exploración lista en ${formatDuration(seconds, true)}`
-          : `✓ Exploration done in ${formatDuration(seconds, false)}`
-        : this.lastLanguageEs
-          ? '✗ La exploración no terminó'
-          : '✗ The exploration did not finish',
+      ok ? `✓ Exploration done in ${formatDuration(seconds, false)}` : '✗ The exploration did not finish',
     );
     this.exploration = undefined;
     // The card goes back to the live task, if any: restore its checklist.
@@ -480,10 +473,11 @@ export class AgentManager {
   // ---------- session events ----------
 
   private onTool(activity: ToolActivity): void {
+    // The tracker feeds spoken status, so it keeps the user's language; the panel is English.
     const label = say(activity.label, this.lastLanguageEs);
     this.tracker.addTool(label);
     this.log(`[agent] ${activity.name}: ${label}`);
-    this.ui.tool({ id: activity.id, label, detail: activity.detail, state: 'running' });
+    this.ui.tool({ id: activity.id, label: say(activity.label, false), detail: activity.detail, state: 'running' });
     this.pushStatus();
     if (activity.filePath) {
       // Snapshot now, before the edit executes, so the reveal can diff it.
@@ -494,7 +488,7 @@ export class AgentManager {
   private onToolDone(activity: ToolActivity, result: { ok: boolean; output?: string }): void {
     this.ui.tool({
       id: activity.id,
-      label: say(activity.label, this.lastLanguageEs),
+      label: say(activity.label, false),
       detail: activity.detail,
       state: result.ok ? 'ok' : 'error',
       hasOutput: result.output !== undefined,
@@ -566,7 +560,7 @@ export class AgentManager {
     const es = this.lastLanguageEs;
     const what = say(request.title, es);
     this.log(`[agent] permission request: ${what}`);
-    this.ui.permission({ title: what, detail: request.detail, canRemember: request.canRemember });
+    this.ui.permission({ title: say(request.title, false), detail: request.detail, canRemember: request.canRemember });
     this.ui.reveal();
     this.pushStatus();
     // Only the oldest request is announced: the rest are answered in turn, and
@@ -588,7 +582,7 @@ export class AgentManager {
     }
     const next = this.pendingApprovals[0];
     this.ui.permission(
-      next ? { title: say(next.title, this.lastLanguageEs), detail: next.detail, canRemember: next.canRemember } : undefined,
+      next ? { title: say(next.title, false), detail: next.detail, canRemember: next.canRemember } : undefined,
     );
     this.pushStatus();
     // In auto the queue is being drained by the auto-approval itself; reading
@@ -625,7 +619,7 @@ export class AgentManager {
       this.notify(es ? `El agente terminó con un error: ${spoken(resultText).slice(0, 200)}` : `The agent hit an error: ${spoken(resultText).slice(0, 200)}`);
       return;
     }
-    this.ui.milestone(es ? `✓ Terminó en ${formatDuration(seconds, true)}` : `✓ Finished in ${formatDuration(seconds, false)}`);
+    this.ui.milestone(`✓ Finished in ${formatDuration(seconds, false)}`);
     // Prefer the agent's dedicated spoken summary; fall back to the full text.
     const spokenMatch = resultText.match(/SPOKEN:\s*([\s\S]+)$/);
     const summary = spoken(spokenMatch ? spokenMatch[1] : resultText).slice(0, 600);
@@ -834,7 +828,7 @@ export class AgentManager {
     }
     this.tracker.reset(this.tracker.task);
     this.session.send('The user approved the plan by voice. Proceed with the implementation now.');
-    this.ui.milestone(es ? '▶ Plan aprobado' : '▶ Plan approved');
+    this.ui.milestone('▶ Plan approved');
     this.pushStatus();
     return es ? 'Adelante, ejecuta el plan.' : 'Go — executing the plan.';
   }
@@ -846,7 +840,7 @@ export class AgentManager {
     await this.session.interrupt();
     this.pendingApprovals.length = 0;
     this.ui.permission(undefined);
-    this.ui.milestone(es ? '■ Detenido' : '■ Stopped');
+    this.ui.milestone('■ Stopped');
     this.pushStatus();
     return es ? 'Detenido. Si quieres, dime cómo seguir.' : 'Stopped. Tell me how to continue if you want.';
   }

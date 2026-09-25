@@ -103,7 +103,7 @@ export class AssemblyAiStt implements SttProvider {
   private async openSocket(options: SttSessionOptions): Promise<void> {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
-      throw new Error('Missing AssemblyAI API key (run "Kato: Configure API Keys")');
+      throw new Error('Missing AssemblyAI API key (run "Kato: Set an API Key…")');
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -130,7 +130,7 @@ export class AssemblyAiStt implements SttProvider {
         if (this.ws === ws) {
           this.ws = undefined;
         }
-        settle(new Error('AssemblyAI no respondió al handshake'));
+        settle(new Error('AssemblyAI did not answer the handshake'));
       }, HANDSHAKE_TIMEOUT_MS);
       timeout.unref?.();
       this.abortHandshake = (err) => settle(err);
@@ -144,7 +144,7 @@ export class AssemblyAiStt implements SttProvider {
       ws.on('unexpected-response', (_req, res) => {
         const detail =
           res.statusCode === 401
-            ? 'la API key no es válida. Vuelve a configurarla con "Kato: Configure API Keys".'
+            ? 'the API key is invalid. Set it again with "Kato: Set an API Key…".'
             : `HTTP ${res.statusCode}`;
         settle(new Error(`AssemblyAI: ${detail}`));
       });
@@ -241,12 +241,12 @@ export class AssemblyAiStt implements SttProvider {
 function describeClose(code: number, reason: string): string {
   switch (code) {
     case 1008:
-      return 'AssemblyAI 1008: no autorizado. Revisa la API key con "Kato: Configure API Keys".';
+      return 'AssemblyAI 1008: unauthorized. Check the API key with "Kato: Set an API Key…".';
     case 3005:
-      return 'AssemblyAI 3005: la sesión fue cancelada por un error del servidor. Vuelve a intentarlo.';
+      return 'AssemblyAI 3005: the session was cancelled by a server error. Try again.';
     case 3007:
-      return 'AssemblyAI 3007: chunk de audio fuera del rango 50–1000ms o enviado más rápido que tiempo real.';
+      return 'AssemblyAI 3007: audio chunk outside 50–1000ms or sent faster than real time.';
     default:
-      return `AssemblyAI cerró la conexión (${code}): ${reason || 'sin detalle'}`;
+      return `AssemblyAI closed the connection (${code}): ${reason || 'no detail'}`;
   }
 }

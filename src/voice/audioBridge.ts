@@ -35,8 +35,6 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   /** Replayed when the page (re)loads: it may come up after the status was sent. */
   private lastSetup: object | undefined;
   private lastZoom: object | undefined;
-  private lang: 'es' | 'en' = 'en';
-  private languageListener: (() => void) | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -62,7 +60,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand('kato.audio.focus');
     }
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('El panel de audio de Kato no respondió (timeout)')), 5000),
+      setTimeout(() => reject(new Error("Kato's audio panel didn't respond (timeout)")), 5000),
     );
     await Promise.race([this.readyPromise, timeout]);
   }
@@ -88,7 +86,6 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       case 'ready':
         this.ready = true;
         this.readyResolve?.();
-        this.post({ type: 'lang', value: this.lang });
         if (this.lastSetup) {
           this.post(this.lastSetup);
         }
@@ -194,25 +191,6 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   setZoom(zoom: number): void {
     this.lastZoom = { type: 'zoom', value: zoom };
     this.post(this.lastZoom);
-  }
-
-  /** The panel's fixed text follows the conversation: 'es' or anything else (English). */
-  get language(): 'es' | 'en' {
-    return this.lang;
-  }
-
-  setLanguage(language: string | undefined): void {
-    const lang = language === 'es' ? 'es' : 'en';
-    if (lang === this.lang) {
-      return;
-    }
-    this.lang = lang;
-    this.post({ type: 'lang', value: lang });
-    this.languageListener?.();
-  }
-
-  onLanguageChange(listener: () => void): void {
-    this.languageListener = listener;
   }
 
   /** Setup checklist for the empty state (keys, ffmpeg, agent CLI). */
@@ -492,7 +470,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   <div id="agent" data-state="idle">
     <div class="agent-head">
       <span id="agent-dot"></span>
-      <span id="agent-name">Agente</span>
+      <span id="agent-name">Agent</span>
       <span id="agent-state"></span>
       <span class="agent-chip" id="agent-mode"></span>
       <span id="agent-time"></span>
@@ -508,25 +486,25 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       <div id="agent-ask-hint"></div>
     </div>
     <details id="agent-log">
-      <summary id="agent-log-summary">Actividad</summary>
+      <summary id="agent-log-summary">Activity</summary>
       <div id="agent-log-rows"></div>
     </details>
   </div>
 
   <div id="history">
     <div id="empty">
-      <div class="empty-title">Pulsa <b>Ctrl+;</b> y habla</div>
+      <div class="empty-title">Press <b>Ctrl+;</b> and talk</div>
       <div id="setup"></div>
     </div>
   </div>
 
   <footer>
-    <button id="audio-unlock">🔊 Click para habilitar el audio</button>
-    <div id="hint"><kbd>Ctrl+;</kbd> hablar · <kbd>Ctrl+Shift+;</kbd> escribir o pegar</div>
+    <button id="audio-unlock">🔊 Click to enable audio</button>
+    <div id="hint"><kbd>Ctrl+;</kbd> talk · <kbd>Ctrl+Shift+;</kbd> type or paste</div>
     <div id="composer">
       <div style="flex:1">
         <div id="ask"></div>
-        <textarea id="input" rows="1" placeholder="Escribe o pega aquí… (Enter envía, Esc cierra)"
+        <textarea id="input" rows="1" placeholder="Type or paste here… (Enter sends, Esc closes)"
                   autocomplete="off" spellcheck="false"></textarea>
       </div>
       <button id="send" title="Send">Send</button>

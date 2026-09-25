@@ -210,7 +210,7 @@
             "section"
           ],
           "enumDescriptions": [
-            "The agent picks per question: repo-wide → sections, a file/feature → function-by-function, a single function in depth → block-by-block. Voice requests (\"línea por línea\", \"por encima\") always win.",
+            "The agent picks per question: repo-wide → sections, a file/feature → function-by-function, a single function in depth → block-by-block. Voice requests (\"line by line\", \"just an overview\") always win.",
             "Always block/line-level stops — line-by-line walk-through of a small piece of code (up to 12 stops).",
             "Always one stop per function/method — detailed walk-through (up to 12 stops).",
             "Always section-level stops — faster overview (up to 8 stops)."
@@ -258,7 +258,7 @@
             "Automatic: never asks, still shows every action in the panel."
           ],
           "default": "",
-          "description": "Permission level delegated tasks start in. Saying \"ponlo en automático\" / \"sí a todo\" by voice updates this, so the choice survives restarts."
+          "description": "Permission level delegated tasks start in. Saying \"put it on auto\" / \"yes to all\" by voice updates this, so the choice survives restarts."
         },
         "kato.agent.spokenUpdates": {
           "type": "string",
