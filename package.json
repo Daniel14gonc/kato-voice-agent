@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Daniel14gonc/kato.git"
+    "url": "https://github.com/Daniel14gonc/kato-voice-agent.git"
   },
-  "homepage": "https://github.com/Daniel14gonc/kato#readme",
+  "homepage": "https://github.com/Daniel14gonc/kato-voice-agent#readme",
   "bugs": {
-    "url": "https://github.com/Daniel14gonc/kato/issues"
+    "url": "https://github.com/Daniel14gonc/kato-voice-agent/issues"
   },
   "engines": {
     "vscode": "^1.93.0"
