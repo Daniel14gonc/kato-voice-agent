@@ -28,8 +28,12 @@
         "title": "Kato: Cancel / Stop Speaking"
       },
       {
+        "command": "kato.setup",
+        "title": "Kato: Setup (voice, API keys, coding agent)"
+      },
+      {
         "command": "kato.configureApiKeys",
-        "title": "Kato: Configure API Keys"
+        "title": "Kato: Set an API Key…"
       },
       {
         "command": "kato.showLog",
@@ -54,6 +58,14 @@
       {
         "command": "kato.chooseVoice",
         "title": "Kato: Choose Voice"
+      },
+      {
+        "command": "kato.showAgentOutput",
+        "title": "Kato: Show Agent Command Output"
+      },
+      {
+        "command": "kato.showPanel",
+        "title": "Kato: Show Panel"
       }
     ],
     "keybindings": [
@@ -221,6 +233,38 @@
           "type": "string",
           "default": "",
           "description": "Path to the agent CLI binary (e.g. claude). Empty = auto-detect."
+        },
+        "kato.agent.defaultMode": {
+          "type": "string",
+          "enum": [
+            "",
+            "plan",
+            "ask",
+            "agent",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "The agent's own default (Claude Code: normal).",
+            "Plan: read-only, proposes a plan first.",
+            "Manual: asks by voice before every action, edits included.",
+            "Normal: edits freely; asks only for commands that can change things (read-only commands like ls or git status never ask).",
+            "Automatic: never asks, still shows every action in the panel."
+          ],
+          "default": "",
+          "description": "Permission level delegated tasks start in. Saying \"ponlo en automático\" / \"sí a todo\" by voice updates this, so the choice survives restarts."
+        },
+        "kato.agent.spokenUpdates": {
+          "type": "string",
+          "enum": [
+            "milestones",
+            "minimal"
+          ],
+          "enumDescriptions": [
+            "Kato says when the agent has a plan, gives an occasional progress update on long tasks, and speaks when it needs you or finishes.",
+            "Kato only speaks when the agent needs you or finishes. Progress lives in the panel and the status bar."
+          ],
+          "default": "milestones",
+          "description": "How much Kato talks while the coding agent works in the background."
         },
         "kato.mic.device": {
           "type": "string",

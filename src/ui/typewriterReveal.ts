@@ -3,10 +3,13 @@ import * as vscode from 'vscode';
 /** Frame interval for the reveal animation. */
 const TICK_MS = 16;
 /** Per-character pace at the slow end (small blocks read as real typing). */
-const MS_PER_CHAR = 12;
-/** No block takes longer than this to appear, no matter its size. */
-const MAX_DURATION_MS = 2_500;
-const MIN_DURATION_MS = 400;
+const MS_PER_CHAR = 14;
+/**
+ * No block takes longer than this to appear, no matter its size. At 2.5s a
+ * typical 40-line function flashed in too fast to register as typing.
+ */
+const MAX_DURATION_MS = 4_000;
+const MIN_DURATION_MS = 500;
 
 /**
  * Plays a typewriter effect over code the agent just wrote. The text is

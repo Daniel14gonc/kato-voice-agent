@@ -5,6 +5,15 @@ const SONIOX_KEY_SECRET = 'kato.sonioxApiKey';
 const ANTHROPIC_KEY_SECRET = 'kato.anthropicApiKey';
 const ASSEMBLYAI_KEY_SECRET = 'kato.assemblyaiApiKey';
 
+/** SecretStorage ids, by provider. */
+export const SECRET_KEYS = {
+  openai: OPENAI_KEY_SECRET,
+  soniox: SONIOX_KEY_SECRET,
+  anthropic: ANTHROPIC_KEY_SECRET,
+  assemblyai: ASSEMBLYAI_KEY_SECRET,
+} as const;
+export type KeyProvider = keyof typeof SECRET_KEYS;
+
 export interface KatoConfig {
   routerModel: string;
   explainerModel: string;
@@ -26,6 +35,10 @@ export interface KatoConfig {
   agentProvider: string;
   agentModel: string;
   agentCliPath: string;
+  /** Permission level new tasks start in; '' = the provider's default. Voice changes write here. */
+  agentDefaultMode: string;
+  /** 'milestones' = plan + occasional progress + done; 'minimal' = only when it needs you or finishes. */
+  agentSpokenUpdates: string;
   tourGranularity: string;
 }
 
@@ -58,36 +71,14 @@ export function getConfig(): KatoConfig {
     agentProvider: cfg.get<string>('agent.provider', 'claude-code'),
     agentModel: cfg.get<string>('agent.model', ''),
     agentCliPath: cfg.get<string>('agent.cliPath', ''),
+    agentDefaultMode: cfg.get<string>('agent.defaultMode', ''),
+    agentSpokenUpdates: cfg.get<string>('agent.spokenUpdates', 'milestones'),
     tourGranularity: cfg.get<string>('tour.granularity', 'auto'),
   };
 }
 
 export async function getOpenAIKey(context: vscode.ExtensionContext): Promise<string | undefined> {
   return context.secrets.get(OPENAI_KEY_SECRET);
-}
-
-export async function ensureOpenAIKey(context: vscode.ExtensionContext): Promise<string | undefined> {
-  const existing = await getOpenAIKey(context);
-  if (existing) {
-    return existing;
-  }
-  return promptForOpenAIKey(context);
-}
-
-export async function promptForOpenAIKey(context: vscode.ExtensionContext): Promise<string | undefined> {
-  const key = await vscode.window.showInputBox({
-    title: 'Kato: OpenAI API Key',
-    prompt: 'Used for text-to-speech and Kato’s internal models. Stored in VS Code SecretStorage.',
-    password: true,
-    ignoreFocusOut: true,
-    placeHolder: 'sk-...',
-  });
-  if (key && key.trim()) {
-    await context.secrets.store(OPENAI_KEY_SECRET, key.trim());
-    void vscode.window.showInformationMessage('Kato: OpenAI API key saved.');
-    return key.trim();
-  }
-  return undefined;
 }
 
 export async function getSonioxKey(context: vscode.ExtensionContext): Promise<string | undefined> {
@@ -98,52 +89,7 @@ export async function getAnthropicKey(context: vscode.ExtensionContext): Promise
   return context.secrets.get(ANTHROPIC_KEY_SECRET);
 }
 
-export async function promptForAnthropicKey(context: vscode.ExtensionContext): Promise<string | undefined> {
-  const key = await vscode.window.showInputBox({
-    title: 'Kato: Anthropic API Key',
-    prompt: 'Used for spoken answers (kato.llm.provider = anthropic). Leave empty to skip. Stored in VS Code SecretStorage.',
-    password: true,
-    ignoreFocusOut: true,
-    placeHolder: 'sk-ant-...',
-  });
-  if (key && key.trim()) {
-    await context.secrets.store(ANTHROPIC_KEY_SECRET, key.trim());
-    void vscode.window.showInformationMessage('Kato: Anthropic API key saved.');
-    return key.trim();
-  }
-  return undefined;
-}
-
 export async function getAssemblyAiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
   return context.secrets.get(ASSEMBLYAI_KEY_SECRET);
 }
 
-export async function promptForAssemblyAiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
-  const key = await vscode.window.showInputBox({
-    title: 'Kato: AssemblyAI API Key',
-    prompt: 'Used for speech-to-text (kato.stt.provider = assemblyai). Leave empty to skip. Stored in VS Code SecretStorage.',
-    password: true,
-    ignoreFocusOut: true,
-  });
-  if (key && key.trim()) {
-    await context.secrets.store(ASSEMBLYAI_KEY_SECRET, key.trim());
-    void vscode.window.showInformationMessage('Kato: AssemblyAI API key saved.');
-    return key.trim();
-  }
-  return undefined;
-}
-
-export async function promptForSonioxKey(context: vscode.ExtensionContext): Promise<string | undefined> {
-  const key = await vscode.window.showInputBox({
-    title: 'Kato: Soniox API Key',
-    prompt: 'Used for speech-to-text (kato.stt.provider = soniox). Leave empty to skip. Stored in VS Code SecretStorage.',
-    password: true,
-    ignoreFocusOut: true,
-  });
-  if (key && key.trim()) {
-    await context.secrets.store(SONIOX_KEY_SECRET, key.trim());
-    void vscode.window.showInformationMessage('Kato: Soniox API key saved.');
-    return key.trim();
-  }
-  return undefined;
-}

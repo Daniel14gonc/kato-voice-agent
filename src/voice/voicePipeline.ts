@@ -55,7 +55,7 @@ export class VoicePipeline {
   private startToken = 0;
 
   private readonly stateListeners: Array<(state: PipelineState) => void> = [];
-  private readonly pendingNotifications: string[] = [];
+  private readonly pendingNotifications: Array<{ text: string; key?: string }> = [];
   /** Last detected utterance language — notifications reuse it for TTS. */
   private lastLanguage: string | undefined;
   /** Candidate conversation language awaiting a second confirming detection. */
@@ -69,6 +69,8 @@ export class VoicePipeline {
     private readonly llm: LlmProvider,
     private readonly brain: IntentEngine,
     private readonly channel: vscode.OutputChannel,
+    /** Providers really in use: settings, minus those without a key (→ OpenAI). */
+    private readonly voiceProviders: () => { stt: string; tts: string },
   ) {
     bridge.setEvents({
       onReady: () => {},
@@ -129,11 +131,21 @@ export class VoicePipeline {
    * Speaks a spontaneous notification (agent milestones, permission requests).
    * If Kato is mid-conversation it queues and speaks when idle.
    */
-  speakNotification(text: string, language?: string): void {
+  speakNotification(text: string, language?: string, options?: { replaceKey?: string }): void {
     if (language) {
       this.lastLanguage = language;
     }
-    this.pendingNotifications.push(text);
+    const key = options?.replaceKey;
+    if (key) {
+      // "Paso 2 de 5" is worthless once "paso 3 de 5" exists; if both queued
+      // while the user was talking, only the fresher one should play.
+      for (let i = this.pendingNotifications.length - 1; i >= 0; i--) {
+        if (this.pendingNotifications[i].key === key) {
+          this.pendingNotifications.splice(i, 1);
+        }
+      }
+    }
+    this.pendingNotifications.push({ text, key });
     this.flushNotifications();
   }
 
@@ -141,7 +153,7 @@ export class VoicePipeline {
     if (this.state !== 'idle' || this.pendingNotifications.length === 0) {
       return;
     }
-    const text = this.pendingNotifications.shift() as string;
+    const { text } = this.pendingNotifications.shift()!;
     const config = getConfig();
     const abort = new AbortController();
     this.abort = abort;
@@ -251,6 +263,7 @@ export class VoicePipeline {
 
   private async openListeningSession(token: number): Promise<void> {
     const config = getConfig();
+    const sttProvider = this.voiceProviders().stt;
     try {
       await this.bridge.ensureReady();
     } catch (err) {
@@ -271,9 +284,9 @@ export class VoicePipeline {
       await this.stt.connect(
         {
           model:
-            config.sttProvider === 'soniox'
+            sttProvider === 'soniox'
               ? config.sttSonioxModel
-              : config.sttProvider === 'assemblyai'
+              : sttProvider === 'assemblyai'
                 ? config.sttAssemblyaiModel
                 : config.sttModel,
           language: config.sttLanguage,
@@ -497,17 +510,36 @@ export class VoicePipeline {
     granularity?: TourGranularity,
   ): Promise<void> {
     const es = language !== 'en';
+    const agent = this.brain.deep.agentLabel();
     this.metrics?.mark('llmFirstToken');
+    // Say who does the work: when this was "voy a explorar el proyecto", it
+    // sounded like Kato was trying to answer by itself instead of delegating.
     this.enqueueTts(
       es
-        ? 'Dame un momento, voy a explorar el proyecto con el agente. Te aviso en cuanto lo tenga.'
-        : "Give me a moment — I'll explore the project with the agent and get back to you.",
+        ? `Se lo paso a ${agent} para que lea el código y arme el tour. Vas a ver su avance en el panel.`
+        : `Handing it to ${agent} to read the code and build the tour. You'll see its progress in the panel.`,
       config,
       abort,
       language,
     );
 
-    const deep = await this.brain.deep.explore(question, language, abort.signal, granularity);
+    let deep: Awaited<ReturnType<DeepUnderstanding['explore']>>;
+    try {
+      deep = await this.brain.deep.explore(question, language, abort.signal, granularity);
+    } catch (err) {
+      if (abort.signal.aborted) {
+        return;
+      }
+      this.channel.appendLine(`[deep error] ${String(err)}`);
+      const reason = String(err instanceof Error ? err.message : err).slice(0, 140);
+      const failure = es
+        ? `${agent} no pudo terminar la exploración: ${reason}`
+        : `${agent} couldn't finish exploring: ${reason}`;
+      this.enqueueTts(failure, config, abort, language, undefined, true);
+      await this.ttsQueue;
+      this.brain.session.addAssistant(failure);
+      return;
+    }
     if (abort.signal.aborted) {
       return;
     }
@@ -555,7 +587,7 @@ export class VoicePipeline {
         }
         this.bridge.announceSentence(sentence, sentenceId, newBubble);
         await this.tts.speak(sentence, {
-          model: config.ttsProvider === 'soniox' ? config.ttsSonioxModel : config.ttsModel,
+          model: this.voiceProviders().tts === 'soniox' ? config.ttsSonioxModel : config.ttsModel,
           voice: config.ttsVoice,
           language,
           instructions: config.ttsInstructions,

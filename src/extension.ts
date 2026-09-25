@@ -1,18 +1,7 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import {
-  ensureOpenAIKey,
-  getAnthropicKey,
-  getAssemblyAiKey,
-  getConfig,
-  getOpenAIKey,
-  getSonioxKey,
-  promptForAnthropicKey,
-  promptForAssemblyAiKey,
-  promptForOpenAIKey,
-  promptForSonioxKey,
-} from './config';
+import { getAnthropicKey, getAssemblyAiKey, getConfig, getOpenAIKey, getSonioxKey, type KeyProvider } from './config';
 import { AgentManager } from './agent/agentManager';
 import { ClaudeCodeAgent } from './agent/providers/claudeCode';
 import { ClaudeCodeSessionProvider } from './agent/providers/claudeCodeSession';
@@ -29,6 +18,14 @@ import { LlmRouter } from './llm/llmRouter';
 import { OpenAILlm } from './llm/openai';
 import { IntentExecutor } from './router/executor';
 import { IntentRouter, quickAgentIntent } from './router/intentRouter';
+import {
+  checkSetup,
+  effectiveVoiceProviders,
+  keyPresence,
+  promptForKey,
+  runSetupWizard,
+  type KeyPresence,
+} from './setup/setup';
 import { KatoStatusBar } from './ui/statusBar';
 import { AssemblyAiStt } from './voice/assemblyaiStt';
 import { AudioBridge } from './voice/audioBridge';
@@ -58,6 +55,15 @@ export function activate(context: vscode.ExtensionContext): void {
       bridge.showActivity(activity[1]);
     }
   };
+  // Which keys exist decides which voice providers really run: a configured
+  // provider without its key falls back to OpenAI instead of failing.
+  let keys: KeyPresence = { openai: false, soniox: false, assemblyai: false, anthropic: false };
+  const voiceProviders = () => effectiveVoiceProviders(keys);
+  const refreshSetup = async () => {
+    keys = await keyPresence(context.secrets);
+    bridge.setupStatus(await checkSetup(context.secrets));
+  };
+
   const mic = new MicCapture();
   const stt = new SttRouter(
     {
@@ -65,14 +71,14 @@ export function activate(context: vscode.ExtensionContext): void {
       soniox: new SonioxStt(() => getSonioxKey(context), log),
       assemblyai: new AssemblyAiStt(() => getAssemblyAiKey(context), log),
     },
-    () => getConfig().sttProvider,
+    () => voiceProviders().stt,
   );
   const tts = new TtsRouter(
     {
       openai: new OpenAITts(getKey),
       soniox: new SonioxTts(() => getSonioxKey(context)),
     },
-    () => getConfig().ttsProvider,
+    () => voiceProviders().tts,
   );
   const llm = new LlmRouter(
     {
@@ -86,8 +92,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const session = new ConversationSession();
   const intentRouter = new IntentRouter(getKey, () => getConfig().routerModel);
   const tour = new TourEngine(referents);
-  let notify: (text: string) => void = () => {};
+  let notify: (text: string, options?: { replaceKey?: string }) => void = () => {};
   const agentOutput = vscode.window.createOutputChannel('Kato Agent');
+  const statusBar = new KatoStatusBar();
   const agents = new AgentManager(
     {
       'claude-code': new ClaudeCodeSessionProvider(log),
@@ -95,13 +102,19 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     () => ({ provider: getConfig().agentProvider, model: getConfig().agentModel }),
     log,
-    (text) => notify(text),
+    (text, options) => notify(text, options),
     agentOutput,
     {
-      status: (update) => bridge.agentStatus(update),
+      status: (update) => {
+        bridge.agentStatus(update);
+        statusBar.updateAgent(update);
+      },
       tool: (event) => bridge.agentTool(event),
       text: (delta) => bridge.agentText(delta),
       permission: (request) => bridge.agentPermission(request),
+      todos: (todos) => bridge.agentTodos(todos),
+      milestone: (text) => bridge.agentMilestone(text),
+      reveal: () => bridge.reveal(),
     },
   );
   const tests = new TestRunner(context.workspaceState, llm, log, (text) => notify(text));
@@ -124,6 +137,11 @@ export function activate(context: vscode.ExtensionContext): void {
     () => ({ provider: getConfig().agentProvider, model: getConfig().agentModel }),
     context.workspaceState,
     log,
+    {
+      begin: (question, provider, es) => agents.beginExploration(question, provider, es),
+      activity: (activity) => agents.explorationActivity(activity),
+      end: (ok) => agents.endExploration(ok),
+    },
   );
   const pipeline = new VoicePipeline(
     bridge,
@@ -150,10 +168,19 @@ export function activate(context: vscode.ExtensionContext): void {
       fastIntent: (transcript) => quickAgentIntent(transcript, agents.waitingApproval),
     },
     channel,
+    voiceProviders,
   );
-  notify = (text) => pipeline.speakNotification(text);
+  notify = (text, options) => pipeline.speakNotification(text, undefined, options);
 
-  const statusBar = new KatoStatusBar();
+  const setup = async (): Promise<boolean> => {
+    const done = await runSetupWizard(context.secrets);
+    await refreshSetup();
+    if (done) {
+      void vscode.window.showInformationMessage('Kato está listo. Pulsa Ctrl+; y pídeme algo.');
+    }
+    return done;
+  };
+
   pipeline.onStateChange((state) => statusBar.update(state));
 
   context.subscriptions.push(
@@ -164,13 +191,18 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand('kato.toggleTalk', async () => {
-      const key = await ensureOpenAIKey(context);
-      if (!key) {
-        void vscode.window.showWarningMessage('Kato necesita una API key de OpenAI para funcionar.');
-        return;
+      if (!(await getKey())) {
+        // First press on a fresh install: walk through setup instead of a
+        // bare "paste your key" box with no context.
+        if (!(await setup()) || !(await getKey())) {
+          return;
+        }
       }
       await pipeline.toggle();
     }),
+    vscode.commands.registerCommand('kato.setup', () => setup()),
+    vscode.commands.registerCommand('kato.showAgentOutput', () => agentOutput.show(true)),
+    vscode.commands.registerCommand('kato.showPanel', () => vscode.commands.executeCommand('kato.audio.focus')),
     vscode.commands.registerCommand('kato.cancel', () => pipeline.cancel()),
     vscode.commands.registerCommand('kato.typeMessage', () => bridge.requestInput('')),
     vscode.commands.registerCommand('kato.chooseVoice', async () => {
@@ -222,10 +254,20 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }),
     vscode.commands.registerCommand('kato.configureApiKeys', async () => {
-      await promptForOpenAIKey(context);
-      await promptForSonioxKey(context);
-      await promptForAnthropicKey(context);
-      await promptForAssemblyAiKey(context);
+      // One key at a time, chosen from a list that says what each one is for.
+      const picked = await vscode.window.showQuickPick(
+        [
+          { label: 'OpenAI', detail: 'Obligatoria: router de intenciones, respuestas y voz por defecto.', value: 'openai' as KeyProvider, description: keys.openai ? '$(check) guardada' : '' },
+          { label: 'AssemblyAI', detail: 'Transcripción (kato.stt.provider = assemblyai).', value: 'assemblyai' as KeyProvider, description: keys.assemblyai ? '$(check) guardada' : '' },
+          { label: 'Soniox', detail: 'Transcripción y voz (kato.stt/tts.provider = soniox).', value: 'soniox' as KeyProvider, description: keys.soniox ? '$(check) guardada' : '' },
+          { label: 'Anthropic', detail: 'Respuestas habladas con Claude (kato.llm.provider = anthropic).', value: 'anthropic' as KeyProvider, description: keys.anthropic ? '$(check) guardada' : '' },
+        ],
+        { title: 'Kato: ¿qué API key quieres configurar?' },
+      );
+      if (picked) {
+        await promptForKey(context.secrets, picked.value, '');
+        await refreshSetup();
+      }
     }),
     vscode.commands.registerCommand('kato.showLog', () => channel.show()),
     vscode.commands.registerCommand('kato.evalRouter', async () => {
@@ -259,6 +301,23 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: () => tour.dispose() },
     { dispose: () => agents.dispose() },
   );
+
+  context.subscriptions.push(
+    context.secrets.onDidChange(() => void refreshSetup()),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('kato')) {
+        void refreshSetup();
+      }
+    }),
+  );
+  void refreshSetup().then(() => {
+    if (!keys.openai && !context.globalState.get('kato.setupPrompted')) {
+      void context.globalState.update('kato.setupPrompted', true);
+      void vscode.window
+        .showInformationMessage('Kato: configúralo en un minuto (voz, API keys y agente de código).', 'Configurar')
+        .then((choice) => (choice ? setup() : undefined));
+    }
+  });
 
   channel.appendLine('Kato activated.');
 }

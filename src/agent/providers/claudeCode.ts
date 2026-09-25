@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { AgentExploreRequest, AgentProvider } from '../agentProvider';
+import { describeTool, toolDetail } from './claudeCodeSession';
 
 /**
  * Claude Code adapter over the `claude` CLI in headless mode (`-p`). In
@@ -100,9 +101,15 @@ export class ClaudeCodeAgent implements AgentProvider {
     if (event.type === 'assistant') {
       for (const block of event.message?.content ?? []) {
         if (block.type === 'tool_use') {
-          const target =
-            block.input?.file_path ?? block.input?.pattern ?? block.input?.query ?? block.input?.command ?? '';
+          const input = (block.input ?? {}) as Record<string, unknown>;
+          const target = input.file_path ?? input.pattern ?? input.query ?? input.command ?? '';
           request.onProgress?.(`${block.name} ${String(target).slice(0, 80)}`.trim());
+          request.onActivity?.({
+            id: String(block.id ?? Math.random()),
+            name: String(block.name),
+            label: describeTool(String(block.name), input),
+            detail: toolDetail(input),
+          });
         }
       }
     } else if (event.type === 'result') {

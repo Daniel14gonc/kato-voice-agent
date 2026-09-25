@@ -92,6 +92,15 @@ export interface ToolActivity {
   filePath?: string;
 }
 
+/** One step of the agent's own plan (Claude Code todos/tasks, Codex todo_list). */
+export interface AgentTodo {
+  id: string;
+  text: string;
+  /** Present-continuous form when the agent provides one ("Corriendo los tests"). */
+  activeText?: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 export interface AgentSessionEvents {
   /** A tool started. */
   onTool(activity: ToolActivity): void;
@@ -107,6 +116,11 @@ export interface AgentSessionEvents {
   onPermissionRequest(request: PermissionRequest): void;
   /** A pending request stopped being pending (answered, timed out, cancelled). */
   onPermissionResolved?(id: string): void;
+  /**
+   * The agent's step list changed. Always the full list, in order: these are
+   * the milestones Kato shows as a checklist and speaks sparingly.
+   */
+  onTodos?(todos: AgentTodo[]): void;
   /** The agent asked the user a question in a way Kato must voice itself. */
   onQuestion?(question: string, options: string[]): void;
   onError(message: string): void;
@@ -130,6 +144,8 @@ export interface StartSessionOptions {
   extraDirs: string[];
   model?: string;
   mode: AgentMode;
+  /** Language the user speaks; providers ask the agent to describe its actions in it. */
+  es: boolean;
   events: AgentSessionEvents;
 }
 

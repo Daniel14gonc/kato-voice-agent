@@ -94,6 +94,13 @@ const ROUTER_SYSTEM_PROMPT =
  */
 const AFFIRMATIVE =
   /^(s[ií]+|sip|simón|dale|vale|ok|okay|claro|correcto|perfecto|adelante|apru[eé]balo|apru[eé]balo ya|aprobado|apru[eé]ba|h[aá]zlo|yes|yeah|yep|yup|sure|go ahead|approve|approve it|do it|allow it)$/i;
+/**
+ * "sí a todo", "dale a todo", "yes to all": approve now and stop asking. The
+ * executor passes the transcript on, and the agent manager reads the blanket
+ * half and switches the agent to auto.
+ */
+const BLANKET_AFFIRMATIVE =
+  /^((s[ií]+|dale|ok|okay|claro|yes|yeah|sure)[\s,]*)?((a|con|to) (todo|todos|all|everything)|apru[eé]ba(lo)? todo|approve (it )?all|approve everything|todo aprobado)$/i;
 const NEGATIVE =
   /^(no|nope|para|det[eé]nte|cancela|canc[eé]lalo|deni[eé]galo|deniega|no lo hagas|don't|dont|do not|deny|deny it|cancel)$/i;
 
@@ -106,7 +113,7 @@ export function quickAgentIntent(transcript: string, waitingApproval: boolean): 
     .trim()
     .replace(/^[¿¡\s]+/, '')
     .replace(/[\s,.!?]+$/, '');
-  if (AFFIRMATIVE.test(text)) {
+  if (AFFIRMATIVE.test(text) || BLANKET_AFFIRMATIVE.test(text)) {
     return { tool: 'agent_control', args: { action: 'approve', mode: null } };
   }
   if (NEGATIVE.test(text)) {

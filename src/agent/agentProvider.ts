@@ -1,3 +1,5 @@
+import type { ToolActivity } from './agentSession';
+
 export interface AgentExploreRequest {
   prompt: string;
   /** Repo root the agent explores. */
@@ -9,6 +11,8 @@ export interface AgentExploreRequest {
   signal: AbortSignal;
   /** Progress lines ("Read foo.ts", "Grep bar") for the Kato log. */
   onProgress?(line: string): void;
+  /** The same progress as structured activity, for the panel's agent card. */
+  onActivity?(activity: ToolActivity): void;
 }
 
 /**

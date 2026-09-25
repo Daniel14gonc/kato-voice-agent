@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { AgentProvider } from '../agent/agentProvider';
+import type { ToolActivity } from '../agent/agentSession';
 import { getConfig } from '../config';
 
 /** One spoken sentence tied to the exact lines it talks about. */
@@ -34,6 +35,13 @@ const NOTES_KEY = 'kato.repoNotes';
 const MAX_NOTES = 5;
 const EXPLORE_TIMEOUT_MS = 4 * 60_000;
 
+/** Where an exploration shows itself while it runs (the panel's agent card). */
+export interface ExplorationHooks {
+  begin(question: string, provider: string, es: boolean): void;
+  activity(activity: ToolActivity): void;
+  end(ok: boolean): void;
+}
+
 /**
  * Deep understanding: questions that need exploring code that is NOT on
  * screen ("explain the repo", "where does feature X live?") are delegated to
@@ -47,6 +55,7 @@ export class DeepUnderstanding {
     private readonly getSelected: () => { provider: string; model: string },
     private readonly memento: vscode.Memento,
     private readonly log: (message: string) => void,
+    private readonly hooks?: ExplorationHooks,
   ) {}
 
   /** Snapshot line with cached knowledge; empty when nothing is cached. */
@@ -59,6 +68,12 @@ export class DeepUnderstanding {
       .map((n) => `- Q: ${n.question}\n  A: ${n.overview.slice(0, 300)}`)
       .join('\n');
     return `REPO NOTES (from earlier agent explorations of this workspace):\n${body}`;
+  }
+
+  /** Spoken name of the agent that will explore ("Claude Code"). */
+  agentLabel(): string {
+    const name = this.getSelected().provider;
+    return name === 'codex' ? 'Codex' : name === 'claude-code' ? 'Claude Code' : name;
   }
 
   clearNotes(): Thenable<void> {
@@ -92,25 +107,28 @@ export class DeepUnderstanding {
 
     this.log(`[agent] exploring with ${provider.name}${model ? ` (${model})` : ''}: "${question}"`);
     const started = Date.now();
-    let raw: string;
+    this.hooks?.begin(question, providerName, language !== 'en');
+    let ok = false;
     try {
-      raw = await provider.runReadOnly({
+      const raw = await provider.runReadOnly({
         prompt: this.buildPrompt(question, language, roots, granularity),
         cwd: roots[0],
         extraDirs: roots.slice(1),
         model: model || undefined,
         signal: combined.signal,
         onProgress: (line) => this.log(`[agent] ${line}`),
+        onActivity: (activity) => this.hooks?.activity(activity),
       });
+      this.log(`[agent] done in ${Math.round((Date.now() - started) / 1000)}s`);
+      const result = await this.parse(raw, roots);
+      await this.saveNote(question, result.overview);
+      ok = true;
+      return result;
     } finally {
       clearTimeout(timer);
       signal.removeEventListener('abort', forward);
+      this.hooks?.end(ok);
     }
-    this.log(`[agent] done in ${Math.round((Date.now() - started) / 1000)}s`);
-
-    const result = await this.parse(raw, roots);
-    await this.saveNote(question, result.overview);
-    return result;
   }
 
   private buildPrompt(

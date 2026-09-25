@@ -176,8 +176,24 @@ class CodexSession implements AgentSession {
         this.log(`[agent] codex thread ${event.thread_id}`);
         return finalText;
       case 'item.started':
+      case 'item.updated':
       case 'item.completed': {
         const item = event.item;
+        if (item.type === 'todo_list') {
+          // Codex only marks items done; the first open one is the current step.
+          const current = item.items.findIndex((todo) => !todo.completed);
+          this.options.events.onTodos?.(
+            item.items.map((todo, index) => ({
+              id: String(index + 1),
+              text: todo.text,
+              status: todo.completed ? 'completed' : index === current ? 'in_progress' : 'pending',
+            })),
+          );
+          return finalText;
+        }
+        if (event.type === 'item.updated') {
+          return finalText;
+        }
         if (item.type === 'command_execution') {
           const command = item.command.slice(0, 120);
           const activity = {
@@ -287,6 +303,13 @@ export class CodexExploreAgent implements AgentProvider {
           finalText = event.item.text;
         } else if (event.item.type === 'command_execution') {
           request.onProgress?.(`Bash ${event.item.command.slice(0, 80)}`);
+          const head = event.item.command.slice(0, 60);
+          request.onActivity?.({
+            id: event.item.id,
+            name: 'Bash',
+            label: { es: `revisar con ${head}`, en: `inspect with ${head}` },
+            detail: event.item.command,
+          });
         } else if (event.item.type === 'error') {
           throw new Error(event.item.message);
         }

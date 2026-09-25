@@ -9,6 +9,7 @@ import type {
 import {
   AsyncQueue,
   type AgentCapabilities,
+  type AgentTodo,
   type AgentMode,
   type AgentModeInfo,
   type AgentSession,
@@ -19,6 +20,7 @@ import {
   type StartSessionOptions,
   type ToolActivity,
 } from '../agentSession';
+import { isReadOnlyCommand } from '../safeCommands';
 
 /** The SDK is ESM-only and our bundle is CJS: load it via native dynamic
  * import, kept out of esbuild's reach so import.meta inside the SDK works. */
@@ -79,6 +81,9 @@ const MODES: AgentModeInfo[] = [
 
 const APPROVAL_TIMEOUT_MS = 180_000;
 
+/** Plan-tracking tools: they feed the checklist, never the activity log. */
+const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet']);
+
 /** Tools whose output is worth streaming into the agent output channel. */
 const COMMAND_TOOLS = new Set(['Bash', 'BashOutput']);
 const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
@@ -123,6 +128,11 @@ class ClaudeCodeSession implements AgentSession {
   private readonly pending = new Map<string, PendingPermission>();
   /** tool_use id → activity, so tool_result frames can be attributed. */
   private readonly runningTools = new Map<string, ToolActivity & { newText?: string }>();
+  /** The agent's plan, in creation order. Keyed by task id. */
+  private readonly todos = new Map<string, AgentTodo>();
+  /** TaskCreate calls waiting for their result, which carries the new id. */
+  private readonly pendingTaskCreates = new Map<string, AgentTodo>();
+  private nextTaskId = 1;
 
   constructor(
     private readonly options: StartSessionOptions,
@@ -141,6 +151,7 @@ class ClaudeCodeSession implements AgentSession {
           cwd: this.options.cwd,
           additionalDirectories: this.options.extraDirs,
           permissionMode: permissionModeFor(this.mode),
+          systemPrompt: { type: 'preset', preset: 'claude_code', append: voiceSystemPrompt(this.options.es) },
           ...(this.options.model ? { model: this.options.model } : {}),
           abortController: this.abort,
           // The agent's own prose, streamed: without it the panel has nothing
@@ -205,6 +216,10 @@ class ClaudeCodeSession implements AgentSession {
         for (const block of message.message.content) {
           if (block.type === 'tool_use') {
             const input = block.input as Record<string, unknown>;
+            if (TODO_TOOLS.has(block.name)) {
+              this.trackTodos(block.id, block.name, input);
+              continue;
+            }
             const activity: ToolActivity & { newText?: string } = {
               id: block.id,
               name: block.name,
@@ -240,6 +255,12 @@ class ClaudeCodeSession implements AgentSession {
           if (block.type !== 'tool_result') {
             continue;
           }
+          const created = this.pendingTaskCreates.get(block.tool_use_id);
+          if (created) {
+            this.pendingTaskCreates.delete(block.tool_use_id);
+            this.addTask(created, extractResultText(block.content));
+            continue;
+          }
           const activity = this.runningTools.get(block.tool_use_id);
           if (!activity) {
             continue;
@@ -265,6 +286,67 @@ class ClaudeCodeSession implements AgentSession {
       default:
         break;
     }
+  }
+
+  /**
+   * Claude Code has shipped two plan tools: TodoWrite (the whole list every
+   * time) and the newer TaskCreate/TaskUpdate (one item at a time). Both end
+   * up as the same ordered list for the panel.
+   */
+  private trackTodos(toolUseId: string, name: string, input: Record<string, unknown>): void {
+    if (name === 'TodoWrite' && Array.isArray(input.todos)) {
+      this.todos.clear();
+      input.todos.forEach((raw, index) => {
+        const item = raw as { content?: unknown; status?: unknown; activeForm?: unknown };
+        const id = String(index + 1);
+        this.todos.set(id, {
+          id,
+          text: String(item.content ?? ''),
+          activeText: typeof item.activeForm === 'string' ? item.activeForm : undefined,
+          status: todoStatus(item.status),
+        });
+      });
+      this.emitTodos();
+    } else if (name === 'TaskCreate' && typeof input.subject === 'string') {
+      this.pendingTaskCreates.set(toolUseId, {
+        id: '',
+        text: input.subject,
+        activeText: typeof input.activeForm === 'string' ? input.activeForm : undefined,
+        status: 'pending',
+      });
+    } else if (name === 'TaskUpdate' && input.taskId !== undefined) {
+      const task = this.todos.get(String(input.taskId));
+      if (!task) {
+        return;
+      }
+      if (input.status === 'deleted') {
+        this.todos.delete(task.id);
+      } else {
+        if (input.status !== undefined) {
+          task.status = todoStatus(input.status);
+        }
+        if (typeof input.subject === 'string') {
+          task.text = input.subject;
+        }
+        if (typeof input.activeForm === 'string') {
+          task.activeText = input.activeForm;
+        }
+      }
+      this.emitTodos();
+    }
+  }
+
+  private addTask(task: AgentTodo, resultText: string): void {
+    // Task ids are small sequential numbers; the result says which one.
+    const match = resultText.match(/"id"\s*:\s*"?(\w+)"?/) ?? resultText.match(/#(\d+)/);
+    task.id = match ? match[1] : String(this.nextTaskId);
+    this.nextTaskId = Math.max(this.nextTaskId, Number(task.id) || 0) + 1;
+    this.todos.set(task.id, task);
+    this.emitTodos();
+  }
+
+  private emitTodos(): void {
+    this.options.events.onTodos?.([...this.todos.values()].map((todo) => ({ ...todo })));
   }
 
   private onPermission(
@@ -293,6 +375,19 @@ class ClaudeCodeSession implements AgentSession {
 
     if (this.mode === 'auto') {
       this.log(`[agent] auto-approved ${toolName}`);
+      return Promise.resolve({ behavior: 'allow' });
+    }
+
+    // `ls`, `git status`, `grep`… cannot change anything. Asking for them is
+    // what made a single task interrupt the user ten times. Manual mode is the
+    // explicit "ask me everything", so it still asks.
+    if (
+      toolName === 'Bash' &&
+      this.mode !== 'ask' &&
+      typeof input.command === 'string' &&
+      isReadOnlyCommand(input.command)
+    ) {
+      this.log(`[agent] read-only command auto-approved: ${input.command.slice(0, 120)}`);
       return Promise.resolve({ behavior: 'allow' });
     }
 
@@ -411,6 +506,10 @@ class ClaudeCodeSession implements AgentSession {
   }
 }
 
+function todoStatus(raw: unknown): AgentTodo['status'] {
+  return raw === 'completed' || raw === 'in_progress' ? raw : 'pending';
+}
+
 function permissionModeFor(mode: AgentMode): PermissionMode {
   return PERMISSION_MODES[mode] ?? 'acceptEdits';
 }
@@ -451,11 +550,19 @@ function speakableCommand(command: string): { text: string; chained: boolean } {
   return { text: words.join(' ') || shorten(command, 40), chained: segments.length > 1 };
 }
 
-function describeTool(name: string, input: Record<string, unknown>): Spoken {
+export function describeTool(name: string, input: Record<string, unknown>): Spoken {
   const command = typeof input.command === 'string' ? input.command : undefined;
   const file = typeof input.file_path === 'string' ? shortPath(input.file_path) : undefined;
   switch (name) {
     case 'Bash': {
+      // The model writes a purpose for every command ("make the script
+      // read-only"), in the user's language per voiceSystemPrompt. That is
+      // what a listener needs; `chmod +400 x` read aloud is not.
+      const purpose = typeof input.description === 'string' ? input.description.trim() : '';
+      if (purpose) {
+        const phrase = lowerFirst(purpose.replace(/[.\s]+$/, ''));
+        return { es: phrase, en: phrase };
+      }
       if (!command) {
         return { es: 'correr un comando', en: 'run a command' };
       }
@@ -503,8 +610,39 @@ function describeTool(name: string, input: Record<string, unknown>): Spoken {
   }
 }
 
+function lowerFirst(text: string): string {
+  // Keep acronyms and identifiers ("NPM", "README") as written.
+  return /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+}
+
+/**
+ * Appended to Claude Code's own system prompt. The task prompt used to carry
+ * all of this, so steering messages sent later lost it; the system prompt
+ * holds for the whole session.
+ */
+function voiceSystemPrompt(es: boolean): string {
+  const language = es ? 'Spanish' : 'English';
+  return (
+    'You are being supervised by voice through Kato, a voice assistant inside VS Code. The user hears a spoken ' +
+    'summary of your actions and approves risky ones by voice, without reading your commands.\n' +
+    `- ALWAYS fill the Bash tool's \`description\` field, written in ${language}, as a short plain-language phrase ` +
+    'that starts with a verb and says the PURPOSE, not the syntax — it is read aloud as "the agent wants to <description>". ' +
+    (es
+      ? 'Examples: "ver qué archivos cambiaron", "instalar las dependencias", "hacer el script ejecutable", "correr los tests de login".\n'
+      : 'Examples: "see which files changed", "install the dependencies", "make the script executable", "run the login tests".\n') +
+    '- For any task with 3 or more steps, keep a todo list with your todo/task tool and update it as you go: Kato shows it ' +
+    'as the progress checklist and uses completed items as spoken milestones. Write todo items in ' +
+    `${language}, short and concrete.\n` +
+    '- There is no interactive UI: never use question or dialog tools. If you need a decision, ask in plain text and stop — ' +
+    'the spoken reply arrives as the next message.\n' +
+    '- When you finish a turn, end your reply with a final line starting with exactly "SPOKEN: " followed by a 1-3 sentence ' +
+    `spoken-style summary in ${language} of what you did or what you need (no markdown, no lists, no file paths — say file ` +
+    'names naturally). Only that line is read aloud.'
+  );
+}
+
 /** Raw target for the panel (never read aloud verbatim). */
-function toolDetail(input: Record<string, unknown>): string | undefined {
+export function toolDetail(input: Record<string, unknown>): string | undefined {
   const candidate = input.command ?? input.file_path ?? input.pattern ?? input.url ?? input.query;
   return typeof candidate === 'string' && candidate ? candidate : undefined;
 }

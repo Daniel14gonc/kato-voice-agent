@@ -19,8 +19,15 @@
   const agentEl = document.getElementById('agent');
   const agentNameEl = document.getElementById('agent-name');
   const agentModeEl = document.getElementById('agent-mode');
-  const agentCountEl = document.getElementById('agent-count');
+  const agentStateEl = document.getElementById('agent-state');
+  const agentTimeEl = document.getElementById('agent-time');
   const agentTaskEl = document.getElementById('agent-task');
+  const agentProgressEl = document.getElementById('agent-progress');
+  const agentProgressBarEl = document.getElementById('agent-progress-bar');
+  const agentStepsEl = document.getElementById('agent-steps');
+  const agentLogSummaryEl = document.getElementById('agent-log-summary');
+  const agentLogRowsEl = document.getElementById('agent-log-rows');
+  const setupEl = document.getElementById('setup');
   const agentNowEl = document.getElementById('agent-now');
   const agentStreamEl = document.getElementById('agent-stream');
   const agentAskEl = document.getElementById('agent-ask');
@@ -411,32 +418,53 @@
     historyEl.textContent = '';
     liveUserTurn = null;
     katoBubble = null;
-    agentRows.clear();
   });
 
   // ---------- agent ----------
   //
-  // A delegated task runs for minutes. Without this the panel said "Idle" the
-  // whole time and the only way to learn anything was to ask out loud — which
-  // then read a truncated shell command back at you.
+  // A delegated task runs for minutes. The card at the top shows who is
+  // working, on which step, for how long, and what it needs from you. Every
+  // tool call lives in the collapsible "Actividad" log inside the card; the
+  // conversation only gets milestones, so it stays readable.
 
-  const agentRows = new Map(); // tool id -> history line
+  const agentRows = new Map(); // tool id -> log row
+  const MAX_LOG_ROWS = 80;
   let agentRunningId = null;
   let agentStreamText = '';
+  let agentStatus = null;
+  let agentTimer = null;
 
   const STATE_LABEL = {
-    starting: 'arrancando',
+    starting: 'arrancando…',
     working: 'trabajando',
-    waiting_approval: 'esperando tu OK',
-    ready: 'listo',
+    exploring: 'explorando el código',
+    waiting_approval: 'espera tu OK',
+    ready: 'terminó',
     closed: 'cerrado',
-    idle: 'inactivo',
+    idle: '',
   };
 
+  function clock(ms) {
+    const total = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  }
+
+  function renderAgentTime() {
+    if (!agentStatus || !agentStatus.startedAt) {
+      agentTimeEl.textContent = '';
+      return;
+    }
+    const end = agentStatus.finishedAt || Date.now();
+    agentTimeEl.textContent =
+      clock(end - agentStatus.startedAt) + (agentStatus.toolCount ? ' · ' + agentStatus.toolCount + ' acciones' : '');
+  }
+
   function renderAgentStatus(msg) {
+    agentStatus = msg;
     agentEl.classList.toggle('open', Boolean(msg.active));
     if (!msg.active) {
-      agentRows.clear();
+      clearInterval(agentTimer);
+      agentTimer = null;
       agentRunningId = null;
       agentStreamText = '';
       agentStreamEl.textContent = '';
@@ -445,10 +473,26 @@
     }
     agentEl.dataset.state = msg.state;
     agentNameEl.textContent = msg.provider;
+    agentStateEl.textContent = STATE_LABEL[msg.state] || msg.state;
     agentModeEl.textContent = msg.modeLabel || '';
-    agentCountEl.textContent = msg.toolCount ? msg.toolCount + ' acciones' : '';
     agentTaskEl.textContent = msg.task || '';
     agentTaskEl.title = msg.task || '';
+    const hasSteps = Boolean(msg.stepCount);
+    agentProgressEl.classList.toggle('indeterminate', !hasSteps && msg.state !== 'ready');
+    if (hasSteps) {
+      const done = agentStepsEl.querySelectorAll('li[data-status="completed"]').length;
+      agentProgressBarEl.style.width = Math.round((done / msg.stepCount) * 100) + '%';
+    } else {
+      agentProgressBarEl.style.width = '';
+    }
+    renderAgentTime();
+    const running = msg.state !== 'ready' && msg.state !== 'closed';
+    if (running && !agentTimer) {
+      agentTimer = setInterval(renderAgentTime, 1000);
+    } else if (!running) {
+      clearInterval(agentTimer);
+      agentTimer = null;
+    }
     if (msg.state === 'ready') {
       // The turn is over: its running prose is stale, and leaving it up reads
       // as if the agent were still mid-thought.
@@ -459,25 +503,50 @@
     }
   }
 
+  function renderAgentTodos(todos) {
+    agentStepsEl.textContent = '';
+    for (const todo of todos) {
+      const li = document.createElement('li');
+      li.dataset.status = todo.status;
+      li.textContent = todo.status === 'in_progress' && todo.activeText ? todo.activeText : todo.text;
+      agentStepsEl.appendChild(li);
+    }
+    if (agentStatus) {
+      renderAgentStatus(agentStatus);
+    }
+  }
+
+  function clearAgentLog() {
+    agentRows.clear();
+    agentLogRowsEl.textContent = '';
+    agentLogSummaryEl.textContent = 'Actividad';
+  }
+
   function renderAgentTool(msg) {
     let row = agentRows.get(msg.id);
     if (!row) {
-      if (emptyEl && emptyEl.parentNode) {
-        emptyEl.remove();
-      }
       row = document.createElement('div');
       row.className = 'activity';
-      historyEl.appendChild(row);
+      row.addEventListener('click', () => {
+        if (row.dataset.output === '1') {
+          post({ type: 'command', command: 'kato.showAgentOutput' });
+        }
+      });
+      agentLogRowsEl.appendChild(row);
       agentRows.set(msg.id, row);
-      trim();
+      while (agentLogRowsEl.children.length > MAX_LOG_ROWS) {
+        agentLogRowsEl.removeChild(agentLogRowsEl.firstChild);
+      }
+      agentLogSummaryEl.textContent = 'Actividad (' + agentRows.size + ')';
     }
     row.dataset.state = msg.state;
+    row.dataset.output = msg.hasOutput ? '1' : '';
     row.textContent = msg.label;
-    row.title = msg.detail || msg.label;
-    scrollToEnd();
+    row.title = (msg.detail || msg.label) + (msg.hasOutput ? '\n(click: ver la salida)' : '');
+    agentLogRowsEl.scrollTop = agentLogRowsEl.scrollHeight;
     if (msg.state === 'running') {
       agentRunningId = msg.id;
-      agentNowEl.textContent = msg.detail || msg.label;
+      agentNowEl.textContent = msg.label;
       agentNowEl.title = msg.detail || msg.label;
     } else if (agentRunningId === msg.id) {
       agentRunningId = null;
@@ -500,10 +569,71 @@
     agentAskTitleEl.textContent = '¿Le doy permiso para ' + request.title + '?';
     // The raw command, verbatim: this is what the user is actually approving.
     agentAskDetailEl.textContent = request.detail || '';
-    agentAskHintEl.textContent = request.canRemember
-      ? 'Di "sí" para aprobar, o "sí, y no me preguntes más".'
-      : 'Di "sí" para aprobar o "no" para denegar.';
+    agentAskHintEl.textContent =
+      'Ctrl+; y di "sí", "no", o "sí a todo" para que no vuelva a preguntar.';
+  }
+
+  function addMilestone(text) {
+    if (emptyEl && emptyEl.parentNode) {
+      emptyEl.remove();
+    }
+    if (text.startsWith('▶')) {
+      // A new task: the previous one's log would only confuse.
+      clearAgentLog();
+    }
+    const line = document.createElement('div');
+    line.className = 'milestone';
+    line.textContent = text;
+    line.title = text;
+    historyEl.appendChild(line);
+    trim();
     scrollToEnd();
+  }
+
+  // ---------- setup checklist (empty state) ----------
+
+  function renderSetup(items) {
+    setupEl.textContent = '';
+    if (!items || items.length === 0) {
+      return;
+    }
+    let missingRequired = false;
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'setup-item';
+      row.dataset.ok = item.ok ? '1' : '0';
+      row.dataset.optional = item.optional ? '1' : '';
+      const mark = document.createElement('span');
+      mark.className = 'mark';
+      mark.textContent = item.ok ? '✓' : item.optional ? '○' : '✗';
+      const body = document.createElement('span');
+      body.textContent = item.label;
+      if (item.hint && !item.ok) {
+        const hint = document.createElement('span');
+        hint.className = 'hint';
+        hint.textContent = item.hint;
+        body.appendChild(hint);
+      }
+      row.appendChild(mark);
+      row.appendChild(body);
+      setupEl.appendChild(row);
+      if (!item.ok && !item.optional) {
+        missingRequired = true;
+      }
+    }
+    if (missingRequired) {
+      const button = document.createElement('button');
+      button.className = 'setup-button';
+      button.textContent = 'Configurar Kato';
+      button.addEventListener('click', () => post({ type: 'command', command: 'kato.setup' }));
+      setupEl.appendChild(button);
+    } else {
+      const examples = document.createElement('div');
+      examples.className = 'setup-examples';
+      examples.textContent =
+        'Prueba: «dame un tour por este repo» · «llévame a la función main» · «agrega validación al formulario de login»';
+      setupEl.appendChild(examples);
+    }
   }
 
   const STATUS_LABEL = {
@@ -568,6 +698,15 @@
         break;
       case 'agentPermission':
         renderAgentPermission(msg.request);
+        break;
+      case 'agentTodos':
+        renderAgentTodos(msg.todos || []);
+        break;
+      case 'agentMilestone':
+        addMilestone(msg.text);
+        break;
+      case 'setupStatus':
+        renderSetup(msg.items);
         break;
     }
   });

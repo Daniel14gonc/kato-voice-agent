@@ -1,4 +1,5 @@
 import type { TtsProvider, TtsSpeakOptions } from './ttsProvider';
+import { OPENAI_VOICES } from './voiceCatalog';
 
 const SPEECH_URL = 'https://api.openai.com/v1/audio/speech';
 
@@ -23,7 +24,9 @@ export class OpenAITts implements TtsProvider {
       },
       body: JSON.stringify({
         model: options.model,
-        voice: options.voice,
+        // kato.tts.voice may name another provider's voice when Kato fell back
+        // to OpenAI for lack of that provider's key.
+        voice: OPENAI_VOICES.some((voice) => voice.id === options.voice) ? options.voice : 'nova',
         input: text,
         response_format: 'pcm',
         // Only gpt-4o TTS models accept style instructions.

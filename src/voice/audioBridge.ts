@@ -1,4 +1,9 @@
 import * as vscode from 'vscode';
+import type { AgentStatusUpdate } from '../agent/agentManager';
+import type { AgentTodo } from '../agent/agentSession';
+
+/** Commands the panel may trigger (buttons, clickable rows). Nothing else. */
+const PANEL_COMMANDS = new Set(['kato.showAgentOutput', 'kato.setup', 'kato.toggleTalk', 'kato.showLog']);
 
 export type PipelineState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
@@ -27,6 +32,8 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   private ready = false;
   private readyPromise: Promise<void> | undefined;
   private readyResolve: (() => void) | undefined;
+  /** Replayed when the page (re)loads: it may come up after the status was sent. */
+  private lastSetup: object | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -78,6 +85,9 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       case 'ready':
         this.ready = true;
         this.readyResolve?.();
+        if (this.lastSetup) {
+          this.post(this.lastSetup);
+        }
         break;
       case 'playbackStarted':
         this.events?.onPlaybackStarted();
@@ -100,6 +110,11 @@ export class AudioBridge implements vscode.WebviewViewProvider {
         break;
       case 'diag':
         this.events?.onDiag(msg.message as string);
+        break;
+      case 'command':
+        if (typeof msg.command === 'string' && PANEL_COMMANDS.has(msg.command)) {
+          void vscode.commands.executeCommand(msg.command);
+        }
         break;
     }
   }
@@ -142,21 +157,50 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     this.post({ type: 'activity', text });
   }
 
-  /** Agent header: who is working, in what mode, on what. */
-  agentStatus(update: {
-    active: boolean;
-    provider: string;
-    state: string;
-    modeLabel: string;
-    task: string;
-    toolCount: number;
-  }): void {
+  /** Agent card: who is working, in what mode, on what step, for how long. */
+  agentStatus(update: AgentStatusUpdate): void {
     this.post({ type: 'agentStatus', ...update });
   }
 
   /** A tool call starting or finishing. Same `id` updates the same row. */
-  agentTool(event: { id: string; label: string; detail?: string; state: 'running' | 'ok' | 'error' }): void {
+  agentTool(event: {
+    id: string;
+    label: string;
+    detail?: string;
+    state: 'running' | 'ok' | 'error';
+    hasOutput?: boolean;
+  }): void {
     this.post({ type: 'agentTool', ...event });
+  }
+
+  /** The agent's plan as a checklist. */
+  agentTodos(todos: AgentTodo[]): void {
+    this.post({ type: 'agentTodos', todos });
+  }
+
+  /** A milestone line in the conversation (task started, step done, finished). */
+  agentMilestone(text: string): void {
+    this.post({ type: 'agentMilestone', text });
+  }
+
+  /** Setup checklist for the empty state (keys, ffmpeg, agent CLI). */
+  setupStatus(items: Array<{ label: string; ok: boolean; optional?: boolean; hint?: string }>): void {
+    this.lastSetup = { type: 'setupStatus', items };
+    this.post(this.lastSetup);
+  }
+
+  /**
+   * Brings the Kato panel into view without stealing the editor's focus — the
+   * user is usually talking, not typing, but may be mid-edit.
+   */
+  reveal(): void {
+    if (this.view) {
+      this.view.show(true);
+      return;
+    }
+    void vscode.commands
+      .executeCommand('kato.audio.focus')
+      .then(() => vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup'));
   }
 
   /** The agent's own prose, streamed — proof of life between tool calls. */
@@ -221,33 +265,57 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     }
     .icon-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); color: var(--vscode-foreground); }
 
-    /* Agent strip: a coding agent works for minutes, so the panel has to show
-       what it is doing without the user having to ask out loud. */
+    /* Agent card: a coding agent works for minutes, so the panel has to show
+       what it is doing — prominently — without the user having to ask. */
     #agent {
-      display: none; flex-direction: column; gap: 4px;
-      padding: 7px 12px 8px;
-      border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.25));
+      display: none; flex-direction: column; gap: 5px;
+      margin: 8px 10px 0; padding: 9px 11px 9px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.3));
+      border-left: 3px solid var(--vscode-charts-blue);
       background: var(--vscode-editorWidget-background);
     }
     #agent.open { display: flex; }
-    .agent-head { display: flex; align-items: center; gap: 7px; font-size: 0.85em; }
-    #agent-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--vscode-descriptionForeground); }
+    #agent[data-state="waiting_approval"] { border-left-color: var(--vscode-charts-yellow); }
+    #agent[data-state="ready"] { border-left-color: var(--vscode-charts-green); }
+    #agent[data-state="exploring"] { border-left-color: var(--vscode-charts-purple, var(--vscode-charts-blue)); }
+    .agent-head { display: flex; align-items: center; gap: 7px; }
+    #agent-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--vscode-descriptionForeground); }
     #agent[data-state="working"] #agent-dot,
     #agent[data-state="starting"] #agent-dot { background: var(--vscode-charts-blue); animation: pulse 1s ease-in-out infinite; }
+    #agent[data-state="exploring"] #agent-dot { background: var(--vscode-charts-purple, var(--vscode-charts-blue)); animation: pulse 1s ease-in-out infinite; }
     #agent[data-state="waiting_approval"] #agent-dot { background: var(--vscode-charts-yellow); animation: pulse 0.7s ease-in-out infinite; }
     #agent[data-state="ready"] #agent-dot { background: var(--vscode-charts-green); }
-    #agent-name { font-weight: 600; }
+    #agent-name { font-weight: 700; }
+    #agent-state { opacity: 0.8; font-size: 0.9em; }
     .agent-chip {
-      font-size: 0.85em; padding: 0 5px; border-radius: 3px;
+      font-size: 0.78em; padding: 0 5px; border-radius: 3px;
       border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.35));
-      opacity: 0.85;
+      opacity: 0.8;
     }
-    #agent-count { margin-left: auto; opacity: 0.55; font-size: 0.9em; }
-    #agent-task { font-size: 0.8em; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .agent-chip:empty { display: none; }
+    #agent-time { margin-left: auto; opacity: 0.7; font-size: 0.85em; font-variant-numeric: tabular-nums; }
+    #agent-task { font-size: 0.85em; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    /* Progress: real when the agent keeps a step list, indeterminate otherwise. */
+    #agent-progress { height: 3px; border-radius: 2px; overflow: hidden; background: var(--vscode-editor-background); position: relative; }
+    #agent-progress-bar { height: 100%; width: 0%; background: var(--vscode-charts-blue); transition: width 300ms ease; }
+    #agent-progress.indeterminate #agent-progress-bar { width: 30%; position: absolute; animation: slide 1.4s ease-in-out infinite; }
+    #agent[data-state="ready"] #agent-progress-bar { background: var(--vscode-charts-green); width: 100%; animation: none; position: static; }
+    #agent[data-state="waiting_approval"] #agent-progress-bar { background: var(--vscode-charts-yellow); animation-play-state: paused; }
+    @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
+    #agent-steps { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.85em; }
+    #agent-steps:empty { display: none; }
+    #agent-steps li { display: flex; gap: 6px; opacity: 0.55; }
+    #agent-steps li::before { content: "○"; width: 1em; flex: none; text-align: center; }
+    #agent-steps li[data-status="in_progress"] { opacity: 1; font-weight: 600; }
+    #agent-steps li[data-status="in_progress"]::before { content: "◐"; color: var(--vscode-charts-blue); }
+    #agent-steps li[data-status="completed"] { opacity: 0.7; }
+    #agent-steps li[data-status="completed"]::before { content: "✓"; color: var(--vscode-charts-green); }
     #agent-now {
-      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em;
+      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em; opacity: 0.8;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    #agent-now::before { content: "◌ "; }
     #agent-now:empty { display: none; }
     /* The agent's own prose, streamed: proof of life between tool calls. */
     #agent-stream {
@@ -255,22 +323,27 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       max-height: 4.2em; overflow: hidden; font-style: italic;
     }
     #agent-stream:empty { display: none; }
-    /* The permission prompt. Showing the real command is the whole point: the
-       spoken prompt used to be "the agent wants to use Bash" for everything. */
+    /* The permission prompt: plain-language title, the exact command below. */
     #agent-ask {
       display: none; flex-direction: column; gap: 4px;
-      margin-top: 3px; padding: 6px 8px; border-radius: 6px;
+      margin-top: 3px; padding: 7px 9px; border-radius: 6px;
       border: 1px solid var(--vscode-charts-yellow);
       background: var(--vscode-input-background);
     }
     #agent-ask.open { display: flex; }
-    #agent-ask-title { font-size: 0.85em; font-weight: 600; }
+    #agent-ask-title { font-size: 0.9em; font-weight: 600; }
     #agent-ask-detail {
-      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em;
+      font-family: var(--vscode-editor-font-family, monospace); font-size: 0.8em; opacity: 0.8;
       white-space: pre-wrap; word-break: break-all; max-height: 7em; overflow: auto;
     }
     #agent-ask-detail:empty { display: none; }
-    #agent-ask-hint { font-size: 0.76em; opacity: 0.6; }
+    #agent-ask-hint { font-size: 0.78em; opacity: 0.7; }
+    /* Every tool call, collapsed: there when you want it, never in the way. */
+    #agent-log { font-size: 0.8em; }
+    #agent-log summary { cursor: pointer; opacity: 0.6; user-select: none; }
+    #agent-log summary:hover { opacity: 0.9; }
+    #agent-log-rows { max-height: 180px; overflow-y: auto; margin-top: 4px; display: flex; flex-direction: column; gap: 1px; }
+    #agent-log-rows .activity[data-output="1"] { cursor: pointer; text-decoration: underline dotted; }
 
     /* History */
     #history { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -302,7 +375,28 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     .activity[data-state="ok"]::before { content: "✓ "; color: var(--vscode-charts-green); opacity: 0.9; }
     .activity[data-state="error"]::before { content: "✗ "; color: var(--vscode-charts-red); opacity: 0.9; }
     .activity[data-state="running"] { opacity: 0.85; }
-    #empty { margin: auto; text-align: center; opacity: 0.45; font-size: 0.85em; line-height: 1.6; }
+    .milestone {
+      align-self: stretch; font-size: 0.8em; opacity: 0.75; padding: 1px 4px;
+      border-left: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.35));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #empty { margin: auto; text-align: center; font-size: 0.85em; line-height: 1.6; max-width: 340px; }
+    .empty-title { opacity: 0.55; }
+    /* First-run checklist: what is set up and what is missing, at a glance. */
+    #setup { margin-top: 12px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+    #setup:empty { display: none; }
+    .setup-item { display: flex; gap: 7px; align-items: baseline; }
+    .setup-item .mark { width: 1em; flex: none; text-align: center; }
+    .setup-item[data-ok="1"] .mark { color: var(--vscode-charts-green); }
+    .setup-item[data-ok="0"] .mark { color: var(--vscode-charts-red); }
+    .setup-item[data-ok="0"][data-optional="1"] .mark { color: var(--vscode-descriptionForeground); }
+    .setup-item .hint { display: block; opacity: 0.6; font-size: 0.9em; }
+    .setup-examples { margin-top: 10px; opacity: 0.6; font-size: 0.92em; }
+    .setup-button {
+      margin-top: 8px; padding: 5px 12px; border-radius: 6px; cursor: pointer; border: none; align-self: center;
+      background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+    }
+    .setup-button:hover { background: var(--vscode-button-hoverBackground); }
 
     /* Composer: summoned, never permanent — this is a voice-first surface.
        It appears when Kato asks for a value, on the type shortcut, or when
@@ -366,10 +460,13 @@ export class AudioBridge implements vscode.WebviewViewProvider {
     <div class="agent-head">
       <span id="agent-dot"></span>
       <span id="agent-name">Agente</span>
+      <span id="agent-state"></span>
       <span class="agent-chip" id="agent-mode"></span>
-      <span id="agent-count"></span>
+      <span id="agent-time"></span>
     </div>
     <div id="agent-task"></div>
+    <div id="agent-progress" class="indeterminate"><div id="agent-progress-bar"></div></div>
+    <ol id="agent-steps"></ol>
     <div id="agent-now"></div>
     <div id="agent-stream"></div>
     <div id="agent-ask">
@@ -377,10 +474,17 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       <div id="agent-ask-detail"></div>
       <div id="agent-ask-hint"></div>
     </div>
+    <details id="agent-log">
+      <summary id="agent-log-summary">Actividad</summary>
+      <div id="agent-log-rows"></div>
+    </details>
   </div>
 
   <div id="history">
-    <div id="empty">Pulsa <b>Ctrl+;</b> y habla</div>
+    <div id="empty">
+      <div class="empty-title">Pulsa <b>Ctrl+;</b> y habla</div>
+      <div id="setup"></div>
+    </div>
   </div>
 
   <footer>
