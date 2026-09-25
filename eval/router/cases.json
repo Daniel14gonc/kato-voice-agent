@@ -1226,5 +1226,153 @@
     "expect": "nav_cycle",
     "expectAction": "prev",
     "context": "withReferents"
+  },
+  {
+    "utterance": "¿qué errores hay?",
+    "expect": "problems",
+    "context": "default",
+    "expectAction": "summary"
+  },
+  {
+    "utterance": "¿por qué está todo en rojo?",
+    "expect": "problems",
+    "context": "withProblems",
+    "expectAction": "summary"
+  },
+  {
+    "utterance": "arregla los errores",
+    "expect": "problems",
+    "context": "withProblems",
+    "expectAction": "fix"
+  },
+  {
+    "utterance": "arréglalos",
+    "expect": "problems",
+    "context": "withProblems",
+    "expectAction": "fix",
+    "note": "after errors were listed"
+  },
+  {
+    "utterance": "¿por qué falla?",
+    "expect": "debug_control",
+    "context": "debugPaused",
+    "expectAction": "explain"
+  },
+  {
+    "utterance": "arréglalo",
+    "expect": "agent_delegate",
+    "context": "debugPaused",
+    "note": "paused state is attached by the executor"
+  },
+  {
+    "utterance": "pon un breakpoint en la función capture_word",
+    "expect": "debug_control",
+    "context": "default",
+    "expectAction": "set_breakpoint"
+  },
+  {
+    "utterance": "¿pasó el CI?",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "ci_status"
+  },
+  {
+    "utterance": "arregla el CI",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "fix_ci"
+  },
+  {
+    "utterance": "¿cómo va mi PR?",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "pr_status"
+  },
+  {
+    "utterance": "léeme los comentarios del review",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "review_comments"
+  },
+  {
+    "utterance": "atiende los comentarios que me dejaron en el PR",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "fix_review"
+  },
+  {
+    "utterance": "¿qué PRs tengo que revisar?",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "list_prs"
+  },
+  {
+    "utterance": "ponme en el PR de Ana",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "checkout_pr"
+  },
+  {
+    "utterance": "¿de qué trata el issue 12?",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "issue"
+  },
+  {
+    "utterance": "trabaja en el issue 12",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "work_on_issue"
+  },
+  {
+    "utterance": "sube esto y abre un PR",
+    "expect": "github",
+    "context": "default",
+    "expectAction": "open_pr"
+  },
+  {
+    "utterance": "¿qué tiene mi rama que no tenga main?",
+    "expect": "git_sync",
+    "context": "default",
+    "expectAction": "compare_main"
+  },
+  {
+    "utterance": "trae lo último de main",
+    "expect": "git_sync",
+    "context": "default",
+    "expectAction": "update_from_main"
+  },
+  {
+    "utterance": "guarda mis cambios aparte",
+    "expect": "git_sync",
+    "context": "default",
+    "expectAction": "stash"
+  },
+  {
+    "utterance": "recupera mis cambios",
+    "expect": "git_sync",
+    "context": "default",
+    "expectAction": "unstash"
+  },
+  {
+    "utterance": "cámbiate a la rama feature login",
+    "expect": "git_branch",
+    "context": "default"
+  },
+  {
+    "utterance": "¿qué hice hoy?",
+    "expect": "daily_summary",
+    "context": "default"
+  },
+  {
+    "utterance": "dame mi standup de ayer",
+    "expect": "daily_summary",
+    "context": "default"
+  },
+  {
+    "utterance": "haz push",
+    "expect": "agent_delegate",
+    "context": "default",
+    "note": "push stays with the agent"
   }
 ]

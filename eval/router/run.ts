@@ -97,6 +97,12 @@ const CONTEXTS: Record<string, string> = {
     ACTIVE_FILE,
     'AGENT: claude-code session ready (mode plan), task: "move scoring into its own service", 9 tools used. The agent presented a plan and is waiting for the user to approve execution.',
   ].join('\n'),
+  withProblems: [
+    WORKSPACE,
+    ACTIVE_FILE,
+    VISIBLE,
+    'PROBLEMS: 4 error(s), 2 warning(s) — errors in capture, llm. "¿qué errores hay?" → problems summary; "arréglalos / fix the errors" → problems fix.',
+  ].join('\n'),
   pendingConfirmation: [
     WORKSPACE,
     ACTIVE_FILE,

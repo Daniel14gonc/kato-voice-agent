@@ -110,6 +110,20 @@ class AgentTracker {
   }
 }
 
+/** One finished agent turn, kept for "¿qué hice hoy?". */
+export interface AgentTaskRecord {
+  /** ISO timestamp when the turn finished. */
+  at: string;
+  task: string;
+  provider: string;
+  seconds: number;
+  summary: string;
+  ok: boolean;
+}
+
+const TASK_LOG_KEY = 'kato.agentTaskLog';
+const TASK_LOG_MAX = 200;
+
 /** A read-only exploration (deep understanding / tours) in flight. */
 interface Exploration {
   question: string;
@@ -172,7 +186,30 @@ export class AgentManager {
     /** Dedicated channel where agent command output (Bash etc.) is streamed. */
     private readonly agentOutput: vscode.OutputChannel,
     private readonly ui: AgentUi,
+    /** Workspace storage for the task log that feeds the daily debrief. */
+    private readonly memento?: vscode.Memento,
   ) {}
+
+  /** Finished agent turns in this workspace, oldest first. */
+  taskLog(): AgentTaskRecord[] {
+    return this.memento?.get<AgentTaskRecord[]>(TASK_LOG_KEY, []) ?? [];
+  }
+
+  private recordTask(summary: string, ok: boolean): void {
+    if (!this.memento || !this.tracker.task) {
+      return;
+    }
+    const log = this.taskLog();
+    log.push({
+      at: new Date().toISOString(),
+      task: this.tracker.task.slice(0, 300),
+      provider: this.providerLabel(),
+      seconds: Math.round(((this.tracker.finishedAt ?? Date.now()) - this.tracker.startedAt) / 1000),
+      summary: summary.slice(0, 400),
+      ok,
+    });
+    void this.memento.update(TASK_LOG_KEY, log.slice(-TASK_LOG_MAX));
+  }
 
   get active(): boolean {
     return this.session !== undefined && this.session.state !== 'closed';
@@ -583,6 +620,7 @@ export class AgentManager {
     const es = this.lastLanguageEs;
     const seconds = Math.round((this.tracker.finishedAt - this.tracker.startedAt) / 1000);
     if (isError) {
+      this.recordTask(spoken(resultText), false);
       this.ui.milestone(`✗ ${spoken(resultText).slice(0, 200)}`);
       this.notify(es ? `El agente terminó con un error: ${spoken(resultText).slice(0, 200)}` : `The agent hit an error: ${spoken(resultText).slice(0, 200)}`);
       return;
@@ -591,6 +629,7 @@ export class AgentManager {
     // Prefer the agent's dedicated spoken summary; fall back to the full text.
     const spokenMatch = resultText.match(/SPOKEN:\s*([\s\S]+)$/);
     const summary = spoken(spokenMatch ? spokenMatch[1] : resultText).slice(0, 600);
+    this.recordTask(summary, true);
     if (this.session?.mode === 'plan') {
       this.notify(
         es

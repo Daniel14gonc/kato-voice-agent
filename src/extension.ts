@@ -6,6 +6,10 @@ import { AgentManager } from './agent/agentManager';
 import { ClaudeCodeAgent } from './agent/providers/claudeCode';
 import { ClaudeCodeSessionProvider } from './agent/providers/claudeCodeSession';
 import { CodexExploreAgent, CodexSessionProvider } from './agent/providers/codexSession';
+import { BranchService } from './commands/branches';
+import { Debrief } from './commands/debrief';
+import { GitHubService } from './commands/github';
+import { ProblemsService } from './commands/problems';
 import { TestRunner } from './commands/testRunner';
 import { ContextEngine } from './context/contextEngine';
 import { DebugController } from './explore/debugController';
@@ -116,7 +120,16 @@ export function activate(context: vscode.ExtensionContext): void {
       milestone: (text) => bridge.agentMilestone(text),
       reveal: () => bridge.reveal(),
     },
+    context.workspaceState,
   );
+  const problems = new ProblemsService();
+  const github = new GitHubService(llm, log);
+  const services = {
+    problems,
+    github,
+    branches: new BranchService(log, (instruction, es) => agents.delegate(instruction, undefined, '', es)),
+    debrief: new Debrief(() => agents.taskLog(), github),
+  };
   const tests = new TestRunner(context.workspaceState, llm, log, (text) => notify(text));
   const debugCtl = new DebugController((text) => notify(text), log);
   const executor = new IntentExecutor(
@@ -128,6 +141,7 @@ export function activate(context: vscode.ExtensionContext): void {
     debugCtl,
     (placeholder, question) => bridge.requestInput(placeholder, question),
     (line) => bridge.showActivity(line),
+    services,
   );
   const deep = new DeepUnderstanding(
     {
@@ -158,6 +172,7 @@ export function activate(context: vscode.ExtensionContext): void {
       tour,
       extraStatusLines: () => [
         agents.statusLine(),
+        problems.statusLine(),
         tests.statusLine(),
         debugCtl.statusLine(),
         executor.pendingConfirmationLine(),

@@ -62,6 +62,16 @@ Presupuesto objetivo: comando IDE < 2 s; primera palabra hablada < 2.5 s.
 | `kato.agent.defaultMode` | *(del agente)* | Nivel de permisos inicial: `plan`, `ask` (manual), `agent` (normal), `auto`. Decir "sí a todo" o "ponlo en automático" lo actualiza |
 | `kato.agent.spokenUpdates` | `milestones` | `milestones`: avisa el plan, un avance ocasional en tareas largas y el final. `minimal`: solo cuando te necesita o termina |
 
+## Qué le puedes pedir
+
+| Di… | Qué hace |
+|---|---|
+| "¿qué errores hay?" · "arréglalos" | Lee el panel Problems, te lleva al primero ("la siguiente" recorre los demás) y le pasa todos al agente |
+| "pon un breakpoint en la función X" · "debuggea" · "¿por qué falla?" · "arréglalo" | Debugger real de VS Code. Pausado, "arréglalo" le pasa al agente la excepción, el stack y las variables |
+| "cámbiate a la rama feature login" · "¿qué tiene mi rama que no tenga main?" · "trae lo último de main" · "guarda / recupera mis cambios" | Ramas con coincidencia aproximada del nombre dictado; stash solo si tus cambios chocan, y siempre preguntando |
+| "¿pasó el CI?" · "arregla el CI" · "¿cómo va mi PR?" · "léeme / atiende los comentarios del review" · "¿qué PRs tengo que revisar?" · "ponme en el PR de Ana" · "trabaja en el issue 12" · "abre un PR" | GitHub con la sesión de VS Code (sin `gh`). Arreglar va al agente con los logs o comentarios; abrir un PR pide confirmación |
+| "¿qué hice hoy?" · "mi standup de ayer" · "¿qué hice esta semana?" | Resumen hablado de tus commits, ramas, cambios pendientes, tareas del agente y PRs |
+
 ## Mientras el agente trabaja
 
 - **Panel de Kato**: tarjeta del agente con estado, reloj, checklist de pasos (la lista de tareas del propio agente), la acción actual y un log de actividad colapsable. Click en un comando para ver su salida.

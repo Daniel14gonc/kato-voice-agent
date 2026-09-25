@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
+import { findWorkspaceSymbols, rankSymbols } from './lspQueries';
 
 /** How long a step command waits for the debugger to report the new position. */
 const STEP_WAIT_MS = 2_500;
+/** Budget for what a paused program tells the agent or the explainer. */
+const CONTEXT_FRAMES = 8;
+const CONTEXT_VARIABLES = 25;
+const CONTEXT_SOURCE_LINES = 4;
 
 /**
  * Ad-hoc launch configs by file extension, used when the workspace has no
@@ -130,6 +135,8 @@ export class DebugController {
   private readonly disposables: vscode.Disposable[] = [];
   private paused: { file: string; line: number } | undefined;
   private lastStoppedThreadId: number | undefined;
+  /** Why the program last stopped ('breakpoint', 'exception', 'step'…). */
+  private lastStopReason: string | undefined;
   /** Set while a step command awaits its 'stopped' event, to mute notify(). */
   private stepWaiter: (() => void) | undefined;
   private lastEs = true;
@@ -148,6 +155,7 @@ export class DebugController {
       vscode.debug.onDidTerminateDebugSession(() => {
         this.paused = undefined;
         this.lastStoppedThreadId = undefined;
+        this.lastStopReason = undefined;
         if (this.stepWaiter) {
           this.stepWaiter();
         } else {
@@ -162,10 +170,13 @@ export class DebugController {
     if (!vscode.debug.activeDebugSession) {
       return '';
     }
-    const at = this.paused ? `paused at ${this.paused.file}:${this.paused.line}` : 'running';
+    const at = this.paused
+      ? `paused at ${this.paused.file}:${this.paused.line}${this.lastStopReason === 'exception' ? ' ON AN EXCEPTION' : ''}`
+      : 'running';
     return (
       `DEBUG: session active, ${at} — "step/siguiente" → step_over, "continue/continúa" → continue, ` +
-      `"what is X / cuánto vale X" → evaluate, "stop the debugger" → stop.`
+      `"what is X / cuánto vale X" → evaluate, "¿por qué falla / qué pasó aquí?" → debug_control explain, ` +
+      `"stop the debugger" → stop. "Arréglalo / fix it" → agent_delegate (Kato attaches the paused state for the agent).`
     );
   }
 
@@ -217,6 +228,13 @@ export class DebugController {
 
   async setBreakpoint(fileHint: string | undefined, line: number | undefined, es: boolean): Promise<string> {
     this.lastEs = es;
+    // "Pon un breakpoint en calculateTotal": a function name, not a file.
+    if (fileHint && line === undefined && !(await this.matchFile(fileHint))) {
+      const atSymbol = await this.breakpointAtSymbol(fileHint, es);
+      if (atSymbol) {
+        return atSymbol;
+      }
+    }
     const uri = await this.resolveFile(fileHint);
     if (!uri) {
       return es ? 'No sé en qué archivo poner el breakpoint.' : "I don't know which file to set the breakpoint in.";
@@ -232,6 +250,115 @@ export class DebugController {
     ]);
     const base = uri.path.split('/').pop();
     return es ? `Breakpoint en ${base}, línea ${targetLine}.` : `Breakpoint at ${base}, line ${targetLine}.`;
+  }
+
+  /**
+   * Breaks on the first statement of a function, not its `def` line: in Python
+   * that line runs once at import, so a breakpoint there never stops a call.
+   */
+  private async breakpointAtSymbol(name: string, es: boolean): Promise<string | undefined> {
+    const best = rankSymbols(await findWorkspaceSymbols(name), name)[0];
+    if (!best || best.score > 3) {
+      return undefined;
+    }
+    const { uri, range } = best.symbol.location;
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const skip = (text: string) =>
+      !text.trim() ||
+      /^\s*(@|def |async def |class |function |export |func |fn |pub fn )/.test(text) ||
+      /^\s*("""|'''|\/\*\*?|\*|\/\/|#)/.test(text) ||
+      /^\s*[{}()]*\s*$/.test(text) ||
+      /[({,]\s*$/.test(text); // a signature continuing on the next line
+    let target = range.start.line;
+    for (let line = range.start.line; line <= Math.min(range.end.line, range.start.line + 15, doc.lineCount - 1); line++) {
+      if (!skip(doc.lineAt(line).text)) {
+        target = line;
+        break;
+      }
+    }
+    vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(uri, new vscode.Position(target, 0)))]);
+    const editor = await vscode.window.showTextDocument(doc, { preserveFocus: true });
+    editor.revealRange(new vscode.Range(target, 0, target, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    const file = (uri.path.split('/').pop() ?? '').replace(/\.[A-Za-z0-9]+$/, '');
+    const hint = vscode.debug.activeDebugSession ? '' : es ? ' Di "debuggea" para arrancar.' : ' Say "debug it" to start.';
+    return es
+      ? `Breakpoint al inicio de ${best.symbol.name}, en ${file}.${hint}`
+      : `Breakpoint at the start of ${best.symbol.name}, in ${file}.${hint}`;
+  }
+
+  /**
+   * What the paused program looks like — why it stopped, the exception, the
+   * stack, the local variables and the code around the current line — as
+   * plain text for the coding agent ("arréglalo") or the explainer ("¿por qué
+   * falla?"). Undefined when nothing is paused.
+   */
+  async captureContext(): Promise<string | undefined> {
+    const session = vscode.debug.activeDebugSession;
+    if (!session || this.lastStoppedThreadId === undefined) {
+      return undefined;
+    }
+    const parts: string[] = [`Debugger (${session.type}) paused — reason: ${this.lastStopReason ?? 'unknown'}.`];
+    try {
+      if (this.lastStopReason === 'exception') {
+        // Not every adapter implements exceptionInfo; the stack still helps.
+        const info = await Promise.resolve(
+          session.customRequest('exceptionInfo', { threadId: this.lastStoppedThreadId }),
+        ).catch(() => undefined);
+        if (info) {
+          parts.push(
+            `Exception: ${info.exceptionId ?? ''} ${info.description ?? ''}`.trim() +
+              (info.details?.stackTrace ? `\n${String(info.details.stackTrace).slice(0, 1500)}` : ''),
+          );
+        }
+      }
+      const trace = await session.customRequest('stackTrace', {
+        threadId: this.lastStoppedThreadId,
+        startFrame: 0,
+        levels: CONTEXT_FRAMES,
+      });
+      const frames: Array<{ id: number; name: string; line: number; source?: { path?: string } }> =
+        trace?.stackFrames ?? [];
+      if (frames.length > 0) {
+        parts.push(
+          'Stack (innermost first):\n' +
+            frames
+              .map((f) => `  ${f.name} — ${f.source?.path ? vscode.workspace.asRelativePath(f.source.path) : '?'}:${f.line}`)
+              .join('\n'),
+        );
+        const top = frames[0];
+        if (top.source?.path) {
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(top.source.path));
+          const from = Math.max(0, top.line - 1 - CONTEXT_SOURCE_LINES);
+          const to = Math.min(doc.lineCount - 1, top.line - 1 + CONTEXT_SOURCE_LINES);
+          const code: string[] = [];
+          for (let line = from; line <= to; line++) {
+            code.push(`${line + 1 === top.line ? '→' : ' '} ${line + 1}: ${doc.lineAt(line).text}`);
+          }
+          parts.push(`Code around the current line:\n${code.join('\n')}`);
+        }
+        const scopes = await session.customRequest('scopes', { frameId: top.id });
+        const local = (scopes?.scopes ?? []).find((scope: { expensive?: boolean }) => !scope.expensive);
+        if (local) {
+          const vars = await session.customRequest('variables', { variablesReference: local.variablesReference });
+          const listed = (vars?.variables ?? [])
+            .filter(
+              (v: { name: string }) =>
+                !/^__.*__$/.test(v.name) && v.name !== 'special variables' && v.name !== 'function variables',
+            )
+            .slice(0, CONTEXT_VARIABLES)
+            .map(
+              (v: { name: string; value: string; type?: string }) =>
+                `  ${v.name}${v.type ? ` (${v.type})` : ''} = ${String(v.value).slice(0, 200)}`,
+            );
+          if (listed.length > 0) {
+            parts.push(`Local variables in ${top.name}:\n${listed.join('\n')}`);
+          }
+        }
+      }
+    } catch (err) {
+      this.log(`[debug] captureContext failed: ${String(err)}`);
+    }
+    return parts.join('\n\n');
   }
 
   removeBreakpoints(es: boolean): string {
@@ -322,6 +449,7 @@ export class DebugController {
       return;
     }
     this.lastStoppedThreadId = msg.body?.threadId;
+    this.lastStopReason = msg.body?.reason;
     try {
       const trace = await session.customRequest('stackTrace', {
         threadId: msg.body?.threadId,
@@ -389,6 +517,11 @@ export class DebugController {
     if (!hint?.trim()) {
       return vscode.window.activeTextEditor?.document.uri;
     }
+    return (await this.matchFile(hint)) ?? vscode.window.activeTextEditor?.document.uri;
+  }
+
+  /** A workspace file matching the spoken name, or undefined (no fallback). */
+  private async matchFile(hint: string): Promise<vscode.Uri | undefined> {
     const said = hint.trim().toLowerCase().split('/').pop() ?? '';
     const stem = said.replace(/\.[a-z0-9]+$/, '');
     const variants = new Set(
@@ -404,6 +537,6 @@ export class DebugController {
         return exact ?? found.sort((a, b) => a.path.length - b.path.length)[0];
       }
     }
-    return vscode.window.activeTextEditor?.document.uri;
+    return undefined;
   }
 }

@@ -7,14 +7,26 @@ import {
   getRepository,
   stageAll,
   summarizeChanges,
-  switchBranch,
 } from '../commands/git';
+import type { BranchService, VoiceOutcome } from '../commands/branches';
+import type { Debrief, DebriefPeriod } from '../commands/debrief';
+import type { GitHubOutcome, GitHubService } from '../commands/github';
+import type { ProblemsService } from '../commands/problems';
 import type { TestRunner } from '../commands/testRunner';
 import { getConfig } from '../config';
 import type { ContextSnapshot } from '../context/contextEngine';
 import type { Referent, ReferentStore } from '../conversation/referents';
 import type { ChatMessage, LlmProvider } from '../llm/llmProvider';
-import { findDefinition, findReferences, findWorkspaceSymbols, goTo, locationLabel, previewLine } from '../explore/lspQueries';
+import {
+  findDefinition,
+  findReferences,
+  findWorkspaceSymbols,
+  goTo,
+  locationLabel,
+  normalizeSymbolQuery,
+  previewLine,
+  rankSymbols,
+} from '../explore/lspQueries';
 import { searchCode, type SearchHit } from '../explore/search';
 import type { DebugController } from '../explore/debugController';
 import type { TourGranularity } from '../explore/deepUnderstanding';
@@ -41,6 +53,20 @@ const ANSWER_SYSTEM_PROMPT =
   '"Eso no lo veo en pantalla; ¿quieres que el agente lo explore?". ' +
   'Keep answers to 1-3 short sentences. Your answer is read aloud by TTS: no markdown, no lists, no code blocks.';
 
+const DEBUG_EXPLAIN_PROMPT =
+  'You are Kato, a voice assistant for programmers. The user is paused in the debugger and asks what is going on. ' +
+  'From the runtime state below, explain in 2-4 short spoken sentences why the program stopped or what is wrong, and ' +
+  'point at the most likely root cause (a specific variable or line). If it looks fixable, end with: say "arréglalo" / ' +
+  '"fix it" and the agent will fix it with this state. No markdown, no lists, no code blocks; say identifiers naturally.';
+
+/** The services behind the newer voice commands (errors, branches, GitHub, standup). */
+export interface ExecutorServices {
+  problems: ProblemsService;
+  branches: BranchService;
+  github: GitHubService;
+  debrief: Debrief;
+}
+
 const EXPLAIN_SYSTEM_PROMPT =
   'You are Kato, a voice assistant for programmers inside VS Code. Explain the given code clearly and briefly, ' +
   'like a colleague talking over your shoulder: what it does and anything notable. 2-4 short sentences max. ' +
@@ -61,7 +87,36 @@ export class IntentExecutor {
     private readonly requestTypedInput: (placeholder: string, question: string) => void,
     /** Shows one line in the panel's activity history (lists go here, not to TTS). */
     private readonly showActivity: (line: string) => void = () => {},
+    private readonly services: ExecutorServices,
   ) {}
+
+  /**
+   * Speaks a service's outcome: its referents become the walkable list
+   * ("la siguiente"), a task goes to the agent, and a question that needs a
+   * "sí" is parked as the pending confirmation.
+   */
+  private async applyOutcome(
+    outcome: GitHubOutcome,
+    snapshot: ContextSnapshot,
+    es: boolean,
+    openFirst = false,
+  ): Promise<ExecutionResult> {
+    let text = outcome.speech;
+    if (outcome.referents && outcome.referents.length > 0) {
+      const refs = this.referents.setResults(outcome.referents, openFirst ? 0 : -1);
+      this.showList(refs);
+      if (openFirst) {
+        await goTo(refs[0].uri, refs[0].range);
+      }
+    }
+    if (outcome.delegate) {
+      text += ` ${this.agents.delegate(outcome.delegate, undefined, snapshot.text, es)}`;
+    }
+    if (outcome.confirm) {
+      this.pending = outcome.confirm;
+    }
+    return speech(text);
+  }
 
   /** Renders a referent list in the panel so speech can stay short. */
   private showList(refs: Referent[]): void {
@@ -100,6 +155,9 @@ export class IntentExecutor {
       'git_branch',
       'git_commit',
       'run_tests',
+      'git_sync',
+      'github',
+      'daily_summary',
     ].includes(intent.tool);
     if (needsWorkspace && !snapshot.hasWorkspace) {
       return speech(
@@ -161,6 +219,23 @@ export class IntentExecutor {
             return speech(await this.debug.step(action, es));
           case 'evaluate':
             return speech(await this.debug.evaluate(target ?? '', es));
+          case 'explain': {
+            const state = await this.debug.captureContext();
+            if (!state) {
+              return speech(
+                es
+                  ? 'El programa no está pausado. Pon un breakpoint o espera a que pare y te explico qué pasa.'
+                  : "The program isn't paused. Set a breakpoint or wait for it to stop and I'll explain.",
+              );
+            }
+            return {
+              kind: 'llm',
+              messages: [
+                { role: 'system', content: DEBUG_EXPLAIN_PROMPT },
+                { role: 'user', content: `${state}\n\nUser asked: ${transcript}` },
+              ],
+            };
+          }
           case 'stop':
             return speech(await this.debug.stopSession(es));
           default:
@@ -173,16 +248,78 @@ export class IntentExecutor {
       }
       case 'agent_delegate': {
         const mode = intent.args.mode;
+        // Paused in the debugger: the runtime state (exception, stack, locals)
+        // is exactly what the agent needs to fix the bug — attach it.
+        const paused = await this.debug.captureContext();
+        const context = paused
+          ? `${snapshot.text}\n\nThe user is paused in the debugger right now. Use this runtime state to find the root cause:\n${paused}`
+          : snapshot.text;
         return speech(
           this.agents.delegate(
             String(intent.args.instruction ?? ''),
             mode === 'ask' || mode === 'plan' || mode === 'agent' || mode === 'auto'
               ? (mode as AgentMode)
               : undefined,
-            snapshot.text,
+            context,
             es,
           ),
         );
+      }
+      case 'problems': {
+        const scope = intent.args.scope === 'file' ? 'file' : 'workspace';
+        if (intent.args.action === 'fix') {
+          const instruction = this.services.problems.fixInstruction(transcript || 'Fix the errors.', scope);
+          if (!instruction) {
+            return speech(es ? 'No hay errores que arreglar.' : 'There are no errors to fix.');
+          }
+          const count = this.services.problems.counted(scope);
+          return speech(
+            `${es ? `Son ${count} error${count === 1 ? '' : 'es'}.` : `${count} error${count === 1 ? '' : 's'}.`} ` +
+              this.agents.delegate(instruction, undefined, snapshot.text, es),
+          );
+        }
+        return this.applyOutcome(this.services.problems.summary(es), snapshot, es, true);
+      }
+      case 'git_sync': {
+        const branches = this.services.branches;
+        const run: Record<string, () => Promise<VoiceOutcome>> = {
+          compare_main: () => branches.compareWithMain(es),
+          update_from_main: () => branches.updateFromMain(es),
+          stash: () => branches.stash(es),
+          unstash: () => branches.unstash(es),
+        };
+        const action = run[String(intent.args.action)] ?? run.compare_main;
+        return this.applyOutcome(await safe(action, es), snapshot, es);
+      }
+      case 'github': {
+        const gh = this.services.github;
+        const number = typeof intent.args.number === 'number' ? intent.args.number : undefined;
+        const who = intent.args.who == null ? undefined : String(intent.args.who);
+        const words = transcript || String(intent.args.action);
+        const actions: Record<string, () => Promise<GitHubOutcome>> = {
+          ci_status: () => gh.ciStatus(es),
+          fix_ci: () => gh.fixCi(words, es),
+          pr_status: () => gh.prStatus(es),
+          review_comments: () => gh.reviewComments(es, signal),
+          fix_review: () => gh.fixReview(words, es),
+          list_prs: () => gh.listPrs(es),
+          checkout_pr: () => gh.checkoutPr(number, who, es),
+          issue: () => gh.issue(number, es, signal),
+          work_on_issue: () => gh.workOnIssue(number, words, es),
+          open_pr: () => gh.openPr(es, signal),
+        };
+        const action = actions[String(intent.args.action)] ?? actions.pr_status;
+        return this.applyOutcome(await action(), snapshot, es);
+      }
+      case 'daily_summary': {
+        const period = (['today', 'yesterday', 'week'] as const).includes(intent.args.period as DebriefPeriod)
+          ? (intent.args.period as DebriefPeriod)
+          : 'today';
+        const debrief = await this.services.debrief.build(period, es);
+        for (const line of debrief.lines) {
+          this.showActivity(line);
+        }
+        return debrief.messages ? { kind: 'llm', messages: debrief.messages } : speech(debrief.speech ?? '');
       }
       case 'agent_control':
         switch (String(intent.args.action ?? 'status')) {
@@ -214,7 +351,11 @@ export class IntentExecutor {
       case 'git_stage':
         return this.gitStage(es);
       case 'git_branch':
-        return this.gitBranch(String(intent.args.name ?? ''), intent.args.create === true, es);
+        return this.applyOutcome(
+          await safe(() => this.services.branches.switchTo(String(intent.args.name ?? ''), intent.args.create === true, es), es),
+          snapshot,
+          es,
+        );
       case 'git_commit':
         return this.gitCommit(
           intent.args.message == null ? undefined : String(intent.args.message),
@@ -672,32 +813,6 @@ export class IntentExecutor {
     );
   }
 
-  private async gitBranch(name: string, create: boolean, es: boolean): Promise<ExecutionResult> {
-    const repo = await getRepository();
-    if (!repo) {
-      return speech(es ? 'Este proyecto no es un repositorio git.' : "This project isn't a git repository.");
-    }
-    if (!name.trim()) {
-      return speech(es ? '¿Cómo se llama la rama?' : "What's the branch name?");
-    }
-    try {
-      const outcome = await switchBranch(repo, name.trim(), create);
-      return speech(
-        outcome === 'created'
-          ? es
-            ? `Listo, creé la rama ${name} y me cambié a ella.`
-            : `Done — created branch ${name} and switched to it.`
-          : es
-            ? `Listo, estás en la rama ${name}.`
-            : `Done — you're on branch ${name}.`,
-      );
-    } catch (err) {
-      return speech(
-        es ? `No pude cambiar de rama: ${errorText(err)}` : `I couldn't switch branches: ${errorText(err)}`,
-      );
-    }
-  }
-
   /** Commits are destructive: build the message, then ask out loud first. */
   private async gitCommit(
     message: string | undefined,
@@ -800,6 +915,16 @@ function speech(text: string): ExecutionResult {
   return { kind: 'speech', text };
 }
 
+/** Git failures (not a repo, no remote, a refused merge) become a spoken sentence, not a dead turn. */
+async function safe(run: () => Promise<VoiceOutcome>, es: boolean): Promise<VoiceOutcome> {
+  try {
+    return await run();
+  } catch (err) {
+    const message = String(err instanceof Error ? err.message : err).slice(0, 160);
+    return { speech: es ? `Git falló: ${message}` : `Git failed: ${message}` };
+  }
+}
+
 function errorText(err: unknown): string {
   return String(err instanceof Error ? err.message : err).slice(0, 160);
 }
@@ -845,52 +970,6 @@ function listSpeech(refs: Referent[], header: string, es: boolean, openedFirst =
     .join('; ');
   const hint = es ? ' Di "ve al segundo" para saltar a otro.' : ' Say "go to the second one" to jump.';
   return `${header}: ${top}.${refs.length > 1 ? hint : ''}`;
-}
-
-/** "la función handle click" → "handleclick": what the user said, comparable to identifiers. */
-function normalizeSymbolQuery(name: string): string {
-  return name.trim().toLowerCase().replace(/[\s_-]+/g, '');
-}
-
-const CALLABLE_KINDS = new Set([
-  vscode.SymbolKind.Function,
-  vscode.SymbolKind.Method,
-  vscode.SymbolKind.Class,
-  vscode.SymbolKind.Interface,
-  vscode.SymbolKind.Constructor,
-  vscode.SymbolKind.Enum,
-  vscode.SymbolKind.Module,
-]);
-
-/**
- * Orders workspace symbols by how likely they are what the user meant:
- * exact name first (spoken names lose case and separators, so those are
- * normalized), then prefix, then substring; functions/classes over variables;
- * the file on screen over others; never generated or vendored code.
- */
-function rankSymbols(
-  symbols: vscode.SymbolInformation[],
-  query: string,
-): Array<{ symbol: vscode.SymbolInformation; score: number }> {
-  const wanted = normalizeSymbolQuery(query);
-  const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
-  return symbols
-    .filter((symbol) => !/\/(node_modules|dist|out|build|\.venv|venv|__pycache__)\//.test(symbol.location.uri.path))
-    .map((symbol) => {
-      const have = normalizeSymbolQuery(symbol.name.replace(/\(.*$/, ''));
-      let score = have === wanted ? 0 : have.startsWith(wanted) ? 3 : have.includes(wanted) ? 5 : 8;
-      if (!CALLABLE_KINDS.has(symbol.kind)) {
-        score += 1;
-      }
-      if (/(^|[/._-])(test|tests|spec|__tests__)([/._-]|$)/i.test(symbol.location.uri.path)) {
-        score += 2;
-      }
-      if (symbol.location.uri.toString() === activeUri) {
-        score -= 0.5;
-      }
-      return { symbol, score };
-    })
-    .sort((a, b) => a.score - b.score || a.symbol.name.length - b.symbol.name.length);
 }
 
 const CONTEXT_LINES = 30;

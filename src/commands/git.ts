@@ -19,8 +19,6 @@ interface GitRepository {
   diff(cached?: boolean): Promise<string>;
   add(paths: string[]): Promise<void>;
   commit(message: string): Promise<void>;
-  createBranch(name: string, checkout: boolean, ref?: string): Promise<void>;
-  checkout(treeish: string): Promise<void>;
 }
 
 interface GitApi {
@@ -93,33 +91,6 @@ export async function commit(repo: GitRepository, message: string): Promise<void
     await stageAll(repo);
   }
   await repo.commit(message);
-}
-
-/**
- * Switches to `name`, creating it when asked. Falls back the other way when
- * the branch turns out to (not) exist — speech is rarely precise about it.
- */
-export async function switchBranch(
-  repo: GitRepository,
-  name: string,
-  create: boolean,
-): Promise<'created' | 'switched'> {
-  if (create) {
-    try {
-      await repo.createBranch(name, true);
-      return 'created';
-    } catch {
-      await repo.checkout(name);
-      return 'switched';
-    }
-  }
-  try {
-    await repo.checkout(name);
-    return 'switched';
-  } catch {
-    await repo.createBranch(name, true);
-    return 'created';
-  }
 }
 
 export type { GitRepository };

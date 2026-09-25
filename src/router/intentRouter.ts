@@ -76,12 +76,27 @@ const ROUTER_SYSTEM_PROMPT =
   '- Debugger: "debuggea este archivo", "arranca el debugger", "debug test.py" → debug_control start. "Pon un breakpoint ' +
   'en la línea 12" → debug_control set_breakpoint. While the snapshot shows an active DEBUG session: "siguiente/step/avanza" ' +
   '→ step_over, "entra/step into" → step_into, "sal/step out" → step_out, "continúa/continue/sigue corriendo" → continue, ' +
-  '"¿qué vale X?/what is X now?" → evaluate with target = the expression, "para el debugger" → stop. If BOTH a tour and a ' +
-  'debug session are active, "siguiente" is the debugger only when they say step/paso; otherwise tour_control. Asking to ' +
-  'FIX the bug is agent_delegate, not debug_control.\n' +
+  '"¿qué vale X?/what is X now?" → evaluate with target = the expression, "¿por qué falla?/¿qué pasó aquí?/explain this ' +
+  'crash" → explain, "para el debugger" → stop. "Pon un breakpoint en la función X" → set_breakpoint with target = X and ' +
+  'line null. If BOTH a tour and a debug session are active, "siguiente" is the debugger only when they say step/paso; ' +
+  'otherwise tour_control. Asking to FIX the bug ("arréglalo", "fix it") is agent_delegate, not debug_control — Kato ' +
+  'attaches the paused program state to the task.\n' +
+  '- Problems panel: "¿qué errores hay?", "¿cuántos errores tengo?", "¿por qué está en rojo?", "llévame a los errores" → ' +
+  'problems summary. "Arregla los errores", "arréglalos" (after errors were listed, or with a PROBLEMS line) → problems fix; ' +
+  'scope file only if they say "de este archivo".\n' +
   '- Git: "muéstrame el diff/qué cambié" → git_diff; "haz stage" → git_stage; "haz commit" → git_commit; ' +
-  '"cámbiate a la rama X"/"crea una branch" → git_branch. ANY other git operation (init, push, pull, merge, ' +
-  'rebase, revert, reset, tag, remotes, resolving conflicts) → agent_delegate, never the closest git tool.\n' +
+  '"cámbiate a la rama X"/"crea una branch" → git_branch. "¿Qué tiene mi rama que no tenga main?", "compárala con main" → ' +
+  'git_sync compare_main; "trae lo último de main", "actualízate con main", "merge main" → git_sync update_from_main; ' +
+  '"guarda mis cambios aparte", "haz stash" → git_sync stash; "recupera mis cambios", "stash pop" → git_sync unstash. ' +
+  'ANY other git operation (init, push, pull, rebase, revert, reset, tag, remotes) → agent_delegate, never the closest git tool.\n' +
+  '- GitHub: "¿pasó el CI?", "¿cómo van los checks?" → github ci_status; "arregla el CI/los tests que fallan en GitHub" → ' +
+  'github fix_ci; "¿cómo va mi PR?" → github pr_status; "léeme los comentarios del review", "¿qué me pidieron en el PR?" → ' +
+  'github review_comments; "arregla/atiende los comentarios del review" → github fix_review; "¿qué PRs hay?", "¿qué tengo ' +
+  'que revisar?" → github list_prs; "ponme en el PR 42 / el PR de Ana" → github checkout_pr (number or who); "¿de qué ' +
+  'trata el issue 12?" → github issue; "trabaja en el issue 12" → github work_on_issue; "abre un PR", "sube esto y abre un ' +
+  'PR" → github open_pr.\n' +
+  '- "¿Qué hice hoy?", "dame mi standup", "resumen de mi día" → daily_summary today; "¿qué hice ayer?" → yesterday; ' +
+  '"¿qué hice esta semana?" → week.\n' +
   'Running the project tests → run_tests.\n' +
   '- Compound utterances still map to ONE tool: pick the one that achieves the whole request. While the agent is waiting, ' +
   '"sí, y ya no me preguntes" → agent_control approve — Kato reads the "stop asking" half itself and remembers the decision.\n' +
@@ -212,13 +227,15 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           'step_out',
           'continue',
           'evaluate',
+          'explain',
           'stop',
         ],
         description: 'What to do with the debugger.',
       },
       target: {
         type: ['string', 'null'],
-        description: 'File name for start/set_breakpoint, or the expression to evaluate. Null when not needed.',
+        description:
+          'File name for start; file OR function name for set_breakpoint; the expression to evaluate. Null when not needed.',
       },
       line: { type: ['number', 'null'], description: '1-based line number for set_breakpoint.' },
     },
@@ -280,6 +297,46 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     },
   }),
   tool('run_tests', "Run the project's test suite and report the result out loud.", {}),
+  tool('problems', "The errors/warnings in VS Code's Problems panel: list them, or have the agent fix them.", {
+    action: { type: 'string', enum: ['summary', 'fix'], description: 'summary = say and walk them; fix = delegate the fix.' },
+    scope: {
+      type: 'string',
+      enum: ['workspace', 'file'],
+      description: 'file only when the user limits it to the current file.',
+    },
+  }),
+  tool('git_sync', 'Branch housekeeping against the default branch and the stash.', {
+    action: {
+      type: 'string',
+      enum: ['compare_main', 'update_from_main', 'stash', 'unstash'],
+      description:
+        'compare_main = what this branch has vs main and vice versa; update_from_main = merge the latest main in; ' +
+        'stash = set uncommitted changes aside; unstash = bring them back.',
+    },
+  }),
+  tool('github', 'GitHub for the current repo and branch: CI, pull requests, reviews, issues.', {
+    action: {
+      type: 'string',
+      enum: [
+        'ci_status',
+        'fix_ci',
+        'pr_status',
+        'review_comments',
+        'fix_review',
+        'list_prs',
+        'checkout_pr',
+        'issue',
+        'work_on_issue',
+        'open_pr',
+      ],
+      description: 'What to do on GitHub.',
+    },
+    number: { type: ['number', 'null'], description: 'PR or issue number when the user said one, else null.' },
+    who: { type: ['string', 'null'], description: 'For checkout_pr: the author or title words ("el PR de Ana"), else null.' },
+  }),
+  tool('daily_summary', 'Spoken standup of what the user did: commits, branches, uncommitted work, agent tasks, PRs.', {
+    period: { type: 'string', enum: ['today', 'yesterday', 'week'], description: 'Which period to summarize.' },
+  }),
   tool(
     'ask_input',
     'Ask the user to TYPE or PASTE an exact value (URL, git remote, token, long path) into the Kato panel.',

@@ -61,3 +61,49 @@ export async function previewLine(uri: vscode.Uri, line: number): Promise<string
 export function locationLabel(uri: vscode.Uri, range: vscode.Range): string {
   return `${vscode.workspace.asRelativePath(uri)}:${range.start.line + 1}`;
 }
+
+/** "la función handle click" → "handleclick": what the user said, comparable to identifiers. */
+export function normalizeSymbolQuery(name: string): string {
+  return name.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+const CALLABLE_KINDS = new Set([
+  vscode.SymbolKind.Function,
+  vscode.SymbolKind.Method,
+  vscode.SymbolKind.Class,
+  vscode.SymbolKind.Interface,
+  vscode.SymbolKind.Constructor,
+  vscode.SymbolKind.Enum,
+  vscode.SymbolKind.Module,
+]);
+
+/**
+ * Orders workspace symbols by how likely they are what the user meant:
+ * exact name first (spoken names lose case and separators, so those are
+ * normalized), then prefix, then substring; functions/classes over variables;
+ * the file on screen over others; never generated or vendored code.
+ */
+export function rankSymbols(
+  symbols: vscode.SymbolInformation[],
+  query: string,
+): Array<{ symbol: vscode.SymbolInformation; score: number }> {
+  const wanted = normalizeSymbolQuery(query);
+  const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
+  return symbols
+    .filter((symbol) => !/\/(node_modules|dist|out|build|\.venv|venv|__pycache__)\//.test(symbol.location.uri.path))
+    .map((symbol) => {
+      const have = normalizeSymbolQuery(symbol.name.replace(/\(.*$/, ''));
+      let score = have === wanted ? 0 : have.startsWith(wanted) ? 3 : have.includes(wanted) ? 5 : 8;
+      if (!CALLABLE_KINDS.has(symbol.kind)) {
+        score += 1;
+      }
+      if (/(^|[/._-])(test|tests|spec|__tests__)([/._-]|$)/i.test(symbol.location.uri.path)) {
+        score += 2;
+      }
+      if (symbol.location.uri.toString() === activeUri) {
+        score -= 0.5;
+      }
+      return { symbol, score };
+    })
+    .sort((a, b) => a.score - b.score || a.symbol.name.length - b.symbol.name.length);
+}
