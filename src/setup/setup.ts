@@ -43,8 +43,8 @@ export async function keyPresence(secrets: vscode.SecretStorage): Promise<KeyPre
 
 /**
  * The providers Kato will actually use: the configured one when its key is
- * there, otherwise OpenAI. A missing Soniox key used to break the mic
- * silently on a fresh install, because Soniox is the default.
+ * there, otherwise OpenAI. A missing provider key used to break the mic
+ * silently on a fresh install; now the default (AssemblyAI) just falls back.
  */
 export function effectiveVoiceProviders(keys: KeyPresence): { stt: string; tts: string } {
   const config = getConfig();
@@ -252,16 +252,16 @@ export async function runSetupWizard(secrets: vscode.SecretStorage): Promise<boo
     'Kato (1/4): ¿con qué quieres que escuche y hable?',
     [
       {
+        label: 'AssemblyAI para escuchar + OpenAI (recomendado)',
+        description: tick(keys.assemblyai),
+        detail: 'Universal-3.5 Pro en streaming: entiende el spanglish técnico y los nombres de tu código. Dos keys.',
+        value: 'assemblyai',
+      },
+      {
         label: 'Solo OpenAI',
         description: tick(keys.openai),
         detail: 'Una sola API key. Lo más simple para empezar.',
         value: 'openai',
-      },
-      {
-        label: 'AssemblyAI para escuchar + OpenAI',
-        description: tick(keys.assemblyai),
-        detail: 'Transcripción en streaming que maneja bien el spanglish técnico. Dos keys.',
-        value: 'assemblyai',
       },
       {
         label: 'Soniox para escuchar y hablar + OpenAI',

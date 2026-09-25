@@ -140,12 +140,12 @@
         "kato.stt.provider": {
           "type": "string",
           "enum": [
+            "assemblyai",
             "soniox",
-            "openai",
-            "assemblyai"
+            "openai"
           ],
-          "default": "soniox",
-          "description": "Speech-to-text provider. Takes effect on the next utterance."
+          "default": "assemblyai",
+          "description": "Speech-to-text provider. AssemblyAI (Universal-3.5 Pro streaming) is the default; without its key Kato falls back to OpenAI. Takes effect on the next utterance."
         },
         "kato.stt.model": {
           "type": "string",
@@ -165,7 +165,7 @@
         "kato.stt.silenceMs": {
           "type": "number",
           "default": 500,
-          "description": "Extra silence (ms) before your utterance is considered finished. Soniox: grace window after its endpoint detection — if you resume speaking within it, the utterance continues (raise this if Kato cuts you off mid-sentence). OpenAI: server VAD silence duration."
+          "description": "Extra silence (ms) before your utterance is considered finished. Soniox: grace window after its endpoint detection — if you resume speaking within it, the utterance continues (raise this if Kato cuts you off mid-sentence). AssemblyAI: minimum silence before it ends the turn. OpenAI: server VAD silence duration."
         },
         "kato.stt.language": {
           "type": "string",

@@ -44,7 +44,8 @@ You don't need exact phrases; these are examples. Spanish works just as well ("Â
 - **VS Code 1.93+ or Cursor**, on **macOS**. Only macOS is tested so far; the Linux and Windows microphone capture exists but has never been tried.
 - **ffmpeg**, for microphone capture: `brew install ffmpeg`.
 - **An OpenAI API key.** Kato uses it to understand requests and to answer.
-- **Optional:** an **AssemblyAI** or **Soniox** key for speech recognition and voice. Without one, Kato uses OpenAI for those too.
+- **Recommended:** an **AssemblyAI** key. Kato listens through AssemblyAI's Universal-3.5 Pro streaming model, which handles technical Spanish/English mixed speech and is biased toward the identifiers on your screen. Without the key, Kato uses OpenAI for transcription.
+- **Optional:** a **Soniox** key for a lower-latency voice. Without it, Kato speaks with OpenAI's voices.
 - **A coding agent you're logged into:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (run `claude` once and sign in) or [Codex](https://github.com/openai/codex) (run `codex login`).
 
 ### Install
@@ -130,8 +131,8 @@ These are the settings you're most likely to change. All of them are under `kato
 | `kato.agent.provider` | `claude-code` | Coding agent: `claude-code` or `codex`. |
 | `kato.agent.defaultMode` | *(agent's default)* | Starting permission level: `plan`, `ask` (manual), `agent` (normal) or `auto`. Saying "put it on auto" updates it. |
 | `kato.agent.spokenUpdates` | `milestones` | `milestones` = plan, occasional progress and done; `minimal` = only when it needs you or finishes. |
-| `kato.stt.provider` | `soniox` | Speech-to-text: `assemblyai`, `soniox` or `openai`. Falls back to OpenAI if that provider's key is missing. |
-| `kato.tts.provider` | `soniox` | Voice: `soniox` or `openai`. Pick a specific voice with *Kato: Choose Voice*. |
+| `kato.stt.provider` | `assemblyai` | Speech-to-text: `assemblyai`, `soniox` or `openai`. Falls back to OpenAI if that provider's key is missing. |
+| `kato.tts.provider` | `soniox` | Voice: `soniox` or `openai`. Falls back to OpenAI if the Soniox key is missing. Pick a specific voice with *Kato: Choose Voice*. |
 | `kato.stt.silenceMs` | `500` | Pause length (ms) that ends your sentence. Raise it if Kato cuts you off. |
 | `kato.models.router` | `gpt-4.1-mini` | Model that decides what each request means. Runs on every request, so it should be fast. |
 | `kato.panel.zoom` | `1.1` | Size of everything in the Kato panel. |

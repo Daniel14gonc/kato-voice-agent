@@ -53,7 +53,7 @@ export function getConfig(): KatoConfig {
     llmProvider: cfg.get<string>('llm.provider', 'openai'),
     ttsProvider: cfg.get<string>('tts.provider', 'soniox'),
     ttsSonioxModel: cfg.get<string>('tts.sonioxModel', 'tts-rt-v2'),
-    sttProvider: cfg.get<string>('stt.provider', 'soniox'),
+    sttProvider: cfg.get<string>('stt.provider', 'assemblyai'),
     sttModel: cfg.get<string>('stt.model', 'gpt-4o-transcribe'),
     sttSonioxModel: cfg.get<string>('stt.sonioxModel', 'stt-rt-v5'),
     sttAssemblyaiModel: cfg.get<string>('stt.assemblyaiModel', 'universal-3-5-pro'),
