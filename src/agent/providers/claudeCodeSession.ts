@@ -397,7 +397,9 @@ class ClaudeCodeSession implements AgentSession {
       id,
       toolName,
       title: describeTool(toolName, input),
-      detail: ctx.description ?? toolDetail(input),
+      // The exact command/path is what the user is approving; the SDK's
+      // description is only a fallback for tools without one.
+      detail: toolDetail(input) ?? ctx.description,
       canRemember: (ctx.suggestions?.length ?? 0) > 0,
     });
     return new Promise<PermissionResult>((resolve) => {

@@ -157,7 +157,7 @@ async function main(): Promise<void> {
           // Tool alone is not the decision: agent_control approve and
           // agent_control set_mode do completely different things.
           got = testCase.expectAction
-            ? `${intent.tool}:${String(intent.args.action ?? 'none')}`
+            ? `${intent.tool}:${String(intent.args.action ?? intent.args.direction ?? 'none')}`
             : intent.tool;
           break;
         } catch (err) {

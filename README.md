@@ -9,7 +9,8 @@
 ### Requisitos
 
 - **ffmpeg** para la captura de micrófono (`brew install ffmpeg`). VS Code bloquea `getUserMedia` en webviews de extensiones ([vscode#323602](https://github.com/microsoft/vscode/issues/323602)), así que Kato captura audio con un proceso ffmpeg en el extension host.
-- API key de OpenAI.
+- API key de OpenAI (obligatoria). Opcional: AssemblyAI o Soniox para la voz; sin su key, Kato usa OpenAI.
+- Un agente de código con sesión iniciada: Claude Code (`claude`) o Codex (`codex login`).
 
 ### Desarrollo (VS Code)
 
@@ -18,7 +19,7 @@ npm install
 ```
 
 1. Abre este proyecto en VS Code y presiona **F5** (lanza el Extension Development Host).
-2. En la ventana nueva, ejecuta el comando **"Kato: Configure API Keys"** y pega tu API key de OpenAI (se guarda en SecretStorage, nunca en settings).
+2. En la ventana nueva, ejecuta **"Kato: Setup"** (o pulsa `Ctrl+;`: sin key de OpenAI arranca el setup solo). Son 4 pasos: con qué escucha/habla, las keys que falten (se validan al pegarlas y se guardan en SecretStorage), qué agente de código usar (detecta cuál tienes instalado y con sesión) y cuánto puede hacer sin preguntarte. El panel de Kato muestra un checklist de lo que falta.
 3. Abre el panel **Kato** (junto a Terminal/Output) — ahí vive la captura de audio y verás transcript + respuesta.
 4. Presiona **`Ctrl+;`** y habla. Al callarte (VAD), Kato transcribe, piensa y responde por voz.
    - `Ctrl+;` de nuevo mientras habla = interrumpirlo y volver a escuchar (barge-in).
@@ -57,6 +58,16 @@ Presupuesto objetivo: comando IDE < 2 s; primera palabra hablada < 2.5 s.
 | `kato.tts.voice` | `nova` | Voz de respuesta |
 | `kato.tts.instructions` | *(en, ritmo rápido)* | Instrucciones de estilo para el TTS |
 | `kato.mic.device` | *(default del sistema)* | Dispositivo de captura (nombre o índice avfoundation) |
+| `kato.agent.provider` | `claude-code` | Agente de código: `claude-code` o `codex` |
+| `kato.agent.defaultMode` | *(del agente)* | Nivel de permisos inicial: `plan`, `ask` (manual), `agent` (normal), `auto`. Decir "sí a todo" o "ponlo en automático" lo actualiza |
+| `kato.agent.spokenUpdates` | `milestones` | `milestones`: avisa el plan, un avance ocasional en tareas largas y el final. `minimal`: solo cuando te necesita o termina |
+
+## Mientras el agente trabaja
+
+- **Panel de Kato**: tarjeta del agente con estado, reloj, checklist de pasos (la lista de tareas del propio agente), la acción actual y un log de actividad colapsable. Click en un comando para ver su salida.
+- **Barra de estado**: `Claude Code · 2/5 · 1:23`, en amarillo cuando espera tu OK. Click abre el panel.
+- **Voz**: solo lo que importa: cuántos pasos planeó, un avance cada ~90 s como máximo en tareas largas, cuándo te necesita y cuándo termina.
+- **Permisos**: los comandos de solo lectura (`ls`, `git status`, `grep`…) nunca preguntan en modo normal. Kato te dice *para qué* es cada comando (no la sintaxis) y el comando exacto aparece en el panel. "Sí a todo" pasa a automático y se recuerda.
 
 ## Arquitectura (M0)
 

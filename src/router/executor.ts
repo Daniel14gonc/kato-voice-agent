@@ -36,6 +36,9 @@ const ANSWER_SYSTEM_PROMPT =
   'You are Kato, a voice assistant for programmers inside VS Code. ' +
   'You can navigate code, search, and explain what the user is looking at; you never generate or edit code. ' +
   'A SNAPSHOT of what the user currently sees may be provided — use it when relevant. ' +
+  'You only know the code in the snapshot. If the question is about this project\'s code and the snapshot does not ' +
+  'contain the answer, do NOT guess: say in one sentence that you can have the coding agent explore it, e.g. ' +
+  '"Eso no lo veo en pantalla; ¿quieres que el agente lo explore?". ' +
   'Keep answers to 1-3 short sentences. Your answer is read aloud by TTS: no markdown, no lists, no code blocks.';
 
 const EXPLAIN_SYSTEM_PROMPT =
@@ -109,6 +112,8 @@ export class IntentExecutor {
     switch (intent.tool) {
       case 'nav_goto_ref':
         return this.gotoRef(String(intent.args.ref_id ?? ''), es);
+      case 'nav_cycle':
+        return this.cycle(intent.args.direction === 'prev' ? 'prev' : 'next', es);
       case 'nav_goto_symbol':
         return this.gotoSymbol(String(intent.args.name ?? ''), es);
       case 'find_references':
@@ -273,9 +278,27 @@ export class IntentExecutor {
       return speech(es ? 'No tengo ese elemento en la lista.' : "I don't have that item on the list.");
     }
     await goTo(ref.uri, ref.range);
-    return speech(es ? `Listo: ${spoken(ref.label, es)}.` : `Done: ${spoken(ref.label, es)}.`);
+    this.referents.markCurrent(ref.id);
+    return speech(es ? `Listo: ${refSpeech(ref, es)}.` : `Done: ${refSpeech(ref, es)}.`);
   }
 
+  /** "la otra", "la siguiente", "the previous one" — walk the last result list. */
+  private async cycle(direction: 'next' | 'prev', es: boolean): Promise<ExecutionResult> {
+    const step = this.referents.step(direction);
+    if (!step) {
+      return speech(es ? 'No tengo una lista de resultados que recorrer.' : "I don't have a result list to walk through.");
+    }
+    await goTo(step.ref.uri, step.ref.range);
+    const position = `${step.index + 1} ${es ? 'de' : 'of'} ${step.total}`;
+    return speech(`${position}: ${refSpeech(step.ref, es)}.`);
+  }
+
+  /**
+   * "Llévame a la función X". This used to jump only when the LSP returned a
+   * single hit or the first hit matched exactly; otherwise it read out "I found
+   * 5 symbols: 1, foo.ts line 12; 2, …" — hopeless by ear. Now it ranks the
+   * candidates, goes to the best one, and mentions the others in one clause.
+   */
   private async gotoSymbol(name: string, es: boolean): Promise<ExecutionResult> {
     // "shopping_cart.py" or "src/foo" is a file, not a symbol — LSP symbol
     // providers don't index file names, so go straight to the file lookup.
@@ -285,8 +308,8 @@ export class IntentExecutor {
         return opened;
       }
     }
-    const symbols = (await findWorkspaceSymbols(name)).slice(0, 8);
-    if (symbols.length === 0) {
+    const ranked = rankSymbols(await findWorkspaceSymbols(name), name);
+    if (ranked.length === 0) {
       // Not a symbol either — maybe a file said without its extension
       // ("open voice pipeline").
       const opened = await this.openFileByName(name, es);
@@ -295,23 +318,36 @@ export class IntentExecutor {
       }
       return speech(
         es
-          ? `No encontré ningún símbolo ni archivo llamado ${name}.`
-          : `I couldn't find a symbol or file called ${name}.`,
+          ? `No encontré ninguna función ni archivo llamado ${name}.`
+          : `I couldn't find a function or file called ${name}.`,
       );
     }
-    if (symbols.length === 1 || symbols[0].name.toLowerCase() === name.toLowerCase()) {
-      const s = symbols[0];
-      await goTo(s.location.uri, s.location.range);
-      this.referents.setResults(symbols.map(symbolToReferent));
-      return speech(
-        es
-          ? `Listo: ${s.name}, en ${spoken(locationLabel(s.location.uri, s.location.range), es)}.`
-          : `Done: ${s.name}, at ${spoken(locationLabel(s.location.uri, s.location.range), es)}.`,
-      );
+    const best = ranked[0];
+    await goTo(best.symbol.location.uri, best.symbol.location.range);
+    const refs = this.referents.setResults(
+      ranked.slice(0, 8).map(({ symbol }) => symbolToReferent(symbol, es)),
+      0,
+    );
+    if (refs.length > 1) {
+      this.showList(refs);
     }
-    const refs = this.referents.setResults(symbols.map(symbolToReferent));
-    this.showList(refs);
-    return speech(listSpeech(refs, es ? `Encontré ${refs.length} símbolos` : `I found ${refs.length} symbols`, es));
+    const where = `${best.symbol.name}, ${es ? 'en' : 'in'} ${fileStem(best.symbol.location.uri)}`;
+    // Only equally good matches are worth mentioning; fuzzy tails are noise.
+    const alternatives = ranked.slice(1, 8).filter((candidate) => candidate.score <= best.score + 1).length;
+    const exact = best.symbol.name.toLowerCase() === normalizeSymbolQuery(name);
+    let text = exact
+      ? es
+        ? `Listo, ${where}.`
+        : `Done — ${where}.`
+      : es
+        ? `No hay ninguna que se llame exactamente ${name}; te llevé a ${where}.`
+        : `Nothing is called exactly ${name}; I took you to ${where}.`;
+    if (alternatives > 0) {
+      text += es
+        ? ` Hay ${alternatives === 1 ? 'otra parecida' : `${alternatives} más parecidas`}; di "la otra" si no era esa.`
+        : ` There ${alternatives === 1 ? 'is one more like it' : `are ${alternatives} more like it`}; say "the other one" if that wasn't it.`;
+    }
+    return speech(text);
   }
 
   /**
@@ -356,15 +392,13 @@ export class IntentExecutor {
           label: vscode.workspace.asRelativePath(uri),
           uri,
           range: new vscode.Range(0, 0, 0, 0),
+          spoken: fileStem(uri),
         })),
+        0,
       );
       this.showList(refs);
     }
-    return speech(
-      es
-        ? `Listo: abrí ${spoken(vscode.workspace.asRelativePath(best.uri), es)}.`
-        : `Done: I opened ${spoken(vscode.workspace.asRelativePath(best.uri), es)}.`,
-    );
+    return speech(es ? `Listo, abrí ${fileStem(best.uri)}.` : `Done — I opened ${fileStem(best.uri)}.`);
   }
 
   private async references(target: string | undefined, es: boolean): Promise<ExecutionResult> {
@@ -414,13 +448,22 @@ export class IntentExecutor {
           uri: loc.uri,
           range: loc.range,
           preview: await previewLine(loc.uri, loc.range.start.line),
+          spoken: fileStem(loc.uri),
         })),
       ),
+      0,
     );
     this.showList(refs);
-    return speech(
-      listSpeech(refs, es ? `${refs.length} referencias de ${subject}` : `${refs.length} references to ${subject}`, es),
-    );
+    await goTo(refs[0].uri, refs[0].range);
+    const count =
+      refs.length === 1
+        ? es
+          ? `Solo un lugar usa ${subject}`
+          : `Only one place uses ${subject}`
+        : es
+          ? `${refs.length} lugares usan ${subject}`
+          : `${refs.length} places use ${subject}`;
+    return speech(listSpeech(refs, count, es, true));
   }
 
   private async search(query: string, es: boolean): Promise<ExecutionResult> {
@@ -448,7 +491,9 @@ export class IntentExecutor {
         uri: hit.uri,
         range: new vscode.Range(hit.line, hit.column, hit.line, hit.column + query.length),
         preview: hit.text,
+        spoken: fileStem(hit.uri),
       })),
+      0,
     );
     this.showList(refs);
     // Open the first hit right away — "search X" almost always means "show me".
@@ -558,7 +603,9 @@ export class IntentExecutor {
         uri: hit.uri,
         range: new vscode.Range(hit.line, hit.column, hit.line, hit.column),
         preview: hit.text,
+        spoken: fileStem(hit.uri),
       })),
+      0,
     );
     await goTo(refs[0].uri, refs[0].range);
     if (spoken) {
@@ -757,33 +804,93 @@ function errorText(err: unknown): string {
   return String(err instanceof Error ? err.message : err).slice(0, 160);
 }
 
-/** "src/voice/foo.ts:42" → "foo.ts, línea 42" — paths read badly aloud. */
-function spoken(label: string, es: boolean): string {
-  const match = label.match(/([^/\\]+):(\d+)$/);
-  return match ? `${match[1]}, ${es ? 'línea' : 'line'} ${match[2]}` : label.split('/').pop() ?? label;
+/**
+ * "src/voice/voicePipeline.ts" → "voicePipeline". By ear, the file name is
+ * all that helps: folders, extensions ("punto t s") and line numbers are noise
+ * — the editor is already showing the exact spot.
+ */
+function fileStem(uri: vscode.Uri): string {
+  const base = uri.path.split('/').pop() ?? uri.path;
+  return base.replace(/\.[A-Za-z0-9]+$/, '') || base;
+}
+
+/** What to say for a referent: its spoken form, else the file part of its label. */
+function refSpeech(ref: Referent, es: boolean): string {
+  if (ref.spoken) {
+    return ref.spoken;
+  }
+  const match = ref.label.match(/([^/\\\s]+?)(?:\.[A-Za-z0-9]+)?:(\d+)$/);
+  return match ? `${es ? 'en' : 'in'} ${match[1]}` : (ref.label.split('/').pop() ?? ref.label);
 }
 
 function listSpeech(refs: Referent[], header: string, es: boolean, openedFirst = false): string {
   // The best hit is already open: reading the list aloud is tedious. Say what
-  // was opened, point at the panel for the rest (the router also sees the
-  // REFERENTS table, so "open the one that isn't a test" still works).
+  // was opened, and how to move on; the list itself is in the panel (the
+  // router also sees the REFERENTS table, so "open the one that isn't a test"
+  // still works).
   if (openedFirst) {
     const rest = refs.length - 1;
     const restPart =
       rest > 0
         ? es
-          ? ` Hay ${rest} resultado${rest === 1 ? '' : 's'} más en el panel; di "ve al segundo" o descríbeme cuál.`
-          : ` There ${rest === 1 ? 'is 1 more result' : `are ${rest} more results`} in the panel; say "go to the second one" or describe which.`
+          ? ` Di "la siguiente" para ir a ${rest === 1 ? 'la otra' : 'la próxima'}.`
+          : ` Say "next" to go to ${rest === 1 ? 'the other one' : 'the next one'}.`
         : '';
-    return `${es ? 'Abrí' : 'I opened'} ${spoken(refs[0].label, es)}.${restPart}`;
+    return `${header}. ${es ? 'Te llevé a' : 'I took you to'} ${refSpeech(refs[0], es)}.${restPart}`;
   }
   // Nothing was opened: the user has to pick, so the top options are spoken.
   const top = refs
     .slice(0, 3)
-    .map((r, i) => `${i + 1}: ${spoken(r.label, es)}`)
+    .map((r, i) => `${i + 1}, ${refSpeech(r, es)}`)
     .join('; ');
   const hint = es ? ' Di "ve al segundo" para saltar a otro.' : ' Say "go to the second one" to jump.';
-  return `${header}. ${top}.${refs.length > 1 ? hint : ''}`;
+  return `${header}: ${top}.${refs.length > 1 ? hint : ''}`;
+}
+
+/** "la función handle click" → "handleclick": what the user said, comparable to identifiers. */
+function normalizeSymbolQuery(name: string): string {
+  return name.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+const CALLABLE_KINDS = new Set([
+  vscode.SymbolKind.Function,
+  vscode.SymbolKind.Method,
+  vscode.SymbolKind.Class,
+  vscode.SymbolKind.Interface,
+  vscode.SymbolKind.Constructor,
+  vscode.SymbolKind.Enum,
+  vscode.SymbolKind.Module,
+]);
+
+/**
+ * Orders workspace symbols by how likely they are what the user meant:
+ * exact name first (spoken names lose case and separators, so those are
+ * normalized), then prefix, then substring; functions/classes over variables;
+ * the file on screen over others; never generated or vendored code.
+ */
+function rankSymbols(
+  symbols: vscode.SymbolInformation[],
+  query: string,
+): Array<{ symbol: vscode.SymbolInformation; score: number }> {
+  const wanted = normalizeSymbolQuery(query);
+  const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
+  return symbols
+    .filter((symbol) => !/\/(node_modules|dist|out|build|\.venv|venv|__pycache__)\//.test(symbol.location.uri.path))
+    .map((symbol) => {
+      const have = normalizeSymbolQuery(symbol.name.replace(/\(.*$/, ''));
+      let score = have === wanted ? 0 : have.startsWith(wanted) ? 3 : have.includes(wanted) ? 5 : 8;
+      if (!CALLABLE_KINDS.has(symbol.kind)) {
+        score += 1;
+      }
+      if (/(^|[/._-])(test|tests|spec|__tests__)([/._-]|$)/i.test(symbol.location.uri.path)) {
+        score += 2;
+      }
+      if (symbol.location.uri.toString() === activeUri) {
+        score -= 0.5;
+      }
+      return { symbol, score };
+    })
+    .sort((a, b) => a.score - b.score || a.symbol.name.length - b.symbol.name.length);
 }
 
 const CONTEXT_LINES = 30;
@@ -795,10 +902,11 @@ async function readAround(uri: vscode.Uri, range: vscode.Range): Promise<string>
   return doc.getText(new vscode.Range(start, 0, end, Number.MAX_SAFE_INTEGER));
 }
 
-function symbolToReferent(s: vscode.SymbolInformation): Omit<Referent, 'id'> {
+function symbolToReferent(s: vscode.SymbolInformation, es: boolean): Omit<Referent, 'id'> {
   return {
     label: `${s.name} — ${locationLabel(s.location.uri, s.location.range)}`,
     uri: s.location.uri,
     range: s.location.range,
+    spoken: `${s.name}, ${es ? 'en' : 'in'} ${fileStem(s.location.uri)}`,
   };
 }

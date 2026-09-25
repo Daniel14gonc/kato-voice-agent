@@ -1139,5 +1139,92 @@
     "expect": "agent_control",
     "expectAction": "set_mode",
     "context": "agentWorking"
+  },
+  {
+    "utterance": "hazme un recorrido por el código",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "tour synonym"
+  },
+  {
+    "utterance": "enséñame cómo está hecho el sistema de créditos",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "'show me how X is built' is a tour, not a spoken answer"
+  },
+  {
+    "utterance": "¿cómo funciona la autenticación en este proyecto?",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "project code off screen → delegate, never answer from general knowledge"
+  },
+  {
+    "utterance": "muéstrame cómo funciona el flujo de reviews",
+    "expect": "explain_deep",
+    "context": "withRepoNotes",
+    "note": "repo notes don't satisfy a request to be shown code"
+  },
+  {
+    "utterance": "show me around this codebase",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "quiero entender este proyecto, llévame por las partes importantes",
+    "expect": "explain_deep",
+    "context": "withRepoNotes"
+  },
+  {
+    "utterance": "¿de dónde sale el section_id que recibe esta función?",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "tracing data across files needs the agent"
+  },
+  {
+    "utterance": "¿qué es un closure?",
+    "expect": "answer",
+    "context": "default",
+    "note": "general knowledge, not about this repo"
+  },
+  {
+    "utterance": "sí a todo",
+    "expect": "agent_control",
+    "expectAction": "approve",
+    "context": "agentWaitingApproval"
+  },
+  {
+    "utterance": "dale, y ya no me preguntes nada más",
+    "expect": "agent_control",
+    "expectAction": "approve",
+    "context": "agentWaitingApproval"
+  },
+  {
+    "utterance": "llévame a la función analyze",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "ve a la clase register view",
+    "expect": "nav_goto_symbol",
+    "context": "default",
+    "note": "spoken identifier without camel case"
+  },
+  {
+    "utterance": "la otra",
+    "expect": "nav_cycle",
+    "expectAction": "next",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "no, esa no era, la siguiente",
+    "expect": "nav_cycle",
+    "expectAction": "next",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "regrésate a la anterior",
+    "expect": "nav_cycle",
+    "expectAction": "prev",
+    "context": "withReferents"
   }
 ]

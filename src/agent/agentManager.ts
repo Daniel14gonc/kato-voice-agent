@@ -435,6 +435,8 @@ export class AgentManager {
           : '✗ The exploration did not finish',
     );
     this.exploration = undefined;
+    // The card goes back to the live task, if any: restore its checklist.
+    this.ui.todos(this.tracker.todos);
     this.pushStatus();
   }
 
