@@ -387,6 +387,9 @@ export class VoicePipeline {
   private async respond(transcript: string, language?: string): Promise<void> {
     const config = getConfig();
     language = this.stickyLanguage(transcript, language);
+    if (language) {
+      this.bridge.setLanguage(language);
+    }
     this.channel.appendLine(`You: ${transcript}${language ? ` [${language}]` : ''}`);
     const abort = new AbortController();
     this.abort = abort;

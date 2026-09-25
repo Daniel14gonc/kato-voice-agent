@@ -64,10 +64,12 @@ export function activate(context: vscode.ExtensionContext): void {
   let keys: KeyPresence = { openai: false, soniox: false, assemblyai: false, anthropic: false };
   const voiceProviders = () => effectiveVoiceProviders(keys);
   bridge.setZoom(getConfig().panelZoom);
+  bridge.setLanguage(vscode.env.language.startsWith('es') ? 'es' : 'en');
   const refreshSetup = async () => {
     keys = await keyPresence(context.secrets);
-    bridge.setupStatus(await checkSetup(context.secrets));
+    bridge.setupStatus(await checkSetup(context.secrets, bridge.language === 'es'));
   };
+  bridge.onLanguageChange(() => void refreshSetup());
 
   const mic = new MicCapture();
   const stt = new SttRouter(

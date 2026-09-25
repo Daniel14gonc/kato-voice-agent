@@ -34,6 +34,69 @@
   const agentAskTitleEl = document.getElementById('agent-ask-title');
   const agentAskDetailEl = document.getElementById('agent-ask-detail');
   const agentAskHintEl = document.getElementById('agent-ask-hint');
+  const emptyTitleEl = document.querySelector('#empty .empty-title');
+
+  // The panel speaks the language of the conversation: the extension sends
+  // 'lang' with VS Code's display language first, then whatever the user talks in.
+  const STRINGS = {
+    en: {
+      status: { idle: 'Idle — Ctrl+; to talk', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…' },
+      agentState: {
+        starting: 'starting…',
+        working: 'working',
+        exploring: 'exploring the code',
+        waiting_approval: 'waiting for your OK',
+        ready: 'done',
+        closed: 'closed',
+        idle: '',
+      },
+      agent: 'Agent',
+      actions: (n) => n + (n === 1 ? ' action' : ' actions'),
+      activity: 'Activity',
+      seeOutput: '(click: see the output)',
+      askTitle: (what) => 'Let it ' + what + '?',
+      askHint: 'Ctrl+; and say "yes", "no", or "yes to all" so it stops asking.',
+      pasted: (n) => n + (n === 1 ? ' line pasted' : ' lines pasted'),
+      placeholder: 'Type or paste here… (Enter sends, Esc closes)',
+      pasteValue: 'Paste the value here…',
+      emptyTitle: 'Press <b>Ctrl+;</b> and talk',
+      hint: '<kbd>Ctrl+;</kbd> talk · <kbd>Ctrl+Shift+;</kbd> type or paste',
+      unlock: '🔊 Click to enable audio',
+      clear: 'Clear',
+      send: 'Send',
+      setup: 'Set up Kato',
+      examples: 'Try: “give me a tour of this repo” · “take me to the main function” · “add validation to the login form”',
+    },
+    es: {
+      status: { idle: 'En espera — Ctrl+; para hablar', listening: 'Escuchando…', thinking: 'Pensando…', speaking: 'Hablando…' },
+      agentState: {
+        starting: 'arrancando…',
+        working: 'trabajando',
+        exploring: 'explorando el código',
+        waiting_approval: 'espera tu OK',
+        ready: 'terminó',
+        closed: 'cerrado',
+        idle: '',
+      },
+      agent: 'Agente',
+      actions: (n) => n + (n === 1 ? ' acción' : ' acciones'),
+      activity: 'Actividad',
+      seeOutput: '(click: ver la salida)',
+      askTitle: (what) => '¿Le doy permiso para ' + what + '?',
+      askHint: 'Ctrl+; y di "sí", "no", o "sí a todo" para que no vuelva a preguntar.',
+      pasted: (n) => n + (n === 1 ? ' línea pegada' : ' líneas pegadas'),
+      placeholder: 'Escribe o pega aquí… (Enter envía, Esc cierra)',
+      pasteValue: 'Pega el valor aquí…',
+      emptyTitle: 'Pulsa <b>Ctrl+;</b> y habla',
+      hint: '<kbd>Ctrl+;</kbd> hablar · <kbd>Ctrl+Shift+;</kbd> escribir o pegar',
+      unlock: '🔊 Click para habilitar el audio',
+      clear: 'Limpiar',
+      send: 'Enviar',
+      setup: 'Configurar Kato',
+      examples: 'Prueba: «dame un tour por este repo» · «llévame a la función main» · «agrega validación al formulario de login»',
+    },
+  };
+  let T = STRINGS.en;
 
   const SAMPLE_RATE = 24000;
   const MAX_TURNS = 120;
@@ -104,7 +167,7 @@
     const lines = text.split('\n').length;
     const chip = document.createElement('div');
     chip.className = 'paste-chip';
-    chip.textContent = '📋 ' + lines + (lines === 1 ? ' línea pegada' : ' líneas pegadas');
+    chip.textContent = '📋 ' + T.pasted(lines);
     const body = document.createElement('div');
     body.className = 'paste-body';
     body.textContent = text;
@@ -354,7 +417,7 @@
     composerEl.classList.toggle('awaiting', Boolean(opts.awaiting));
     hintEl.style.display = 'none';
     askEl.textContent = opts.question || '';
-    inputEl.placeholder = opts.placeholder || 'Escribe o pega aquí… (Enter envía, Esc cierra)';
+    inputEl.placeholder = opts.placeholder || T.placeholder;
     if (opts.value !== undefined) {
       inputEl.value = opts.value;
     }
@@ -434,16 +497,6 @@
   let agentStatus = null;
   let agentTimer = null;
 
-  const STATE_LABEL = {
-    starting: 'arrancando…',
-    working: 'trabajando',
-    exploring: 'explorando el código',
-    waiting_approval: 'espera tu OK',
-    ready: 'terminó',
-    closed: 'cerrado',
-    idle: '',
-  };
-
   function clock(ms) {
     const total = Math.max(0, Math.round(ms / 1000));
     return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
@@ -456,7 +509,7 @@
     }
     const end = agentStatus.finishedAt || Date.now();
     agentTimeEl.textContent =
-      clock(end - agentStatus.startedAt) + (agentStatus.toolCount ? ' · ' + agentStatus.toolCount + ' acciones' : '');
+      clock(end - agentStatus.startedAt) + (agentStatus.toolCount ? ' · ' + T.actions(agentStatus.toolCount) : '');
   }
 
   function renderAgentStatus(msg) {
@@ -473,7 +526,7 @@
     }
     agentEl.dataset.state = msg.state;
     agentNameEl.textContent = msg.provider;
-    agentStateEl.textContent = STATE_LABEL[msg.state] || msg.state;
+    agentStateEl.textContent = msg.state in T.agentState ? T.agentState[msg.state] : msg.state;
     agentModeEl.textContent = msg.modeLabel || '';
     agentTaskEl.textContent = msg.task || '';
     agentTaskEl.title = msg.task || '';
@@ -519,7 +572,7 @@
   function clearAgentLog() {
     agentRows.clear();
     agentLogRowsEl.textContent = '';
-    agentLogSummaryEl.textContent = 'Actividad';
+    agentLogSummaryEl.textContent = T.activity;
   }
 
   function renderAgentTool(msg) {
@@ -537,12 +590,12 @@
       while (agentLogRowsEl.children.length > MAX_LOG_ROWS) {
         agentLogRowsEl.removeChild(agentLogRowsEl.firstChild);
       }
-      agentLogSummaryEl.textContent = 'Actividad (' + agentRows.size + ')';
+      renderLogSummary();
     }
     row.dataset.state = msg.state;
     row.dataset.output = msg.hasOutput ? '1' : '';
     row.textContent = msg.label;
-    row.title = (msg.detail || msg.label) + (msg.hasOutput ? '\n(click: ver la salida)' : '');
+    row.title = (msg.detail || msg.label) + (msg.hasOutput ? '\n' + T.seeOutput : '');
     agentLogRowsEl.scrollTop = agentLogRowsEl.scrollHeight;
     if (msg.state === 'running') {
       agentRunningId = msg.id;
@@ -559,18 +612,24 @@
     agentStreamEl.textContent = agentStreamText;
   }
 
+  function renderLogSummary() {
+    agentLogSummaryEl.textContent = T.activity + (agentRows.size ? ' (' + agentRows.size + ')' : '');
+  }
+
+  let agentPermission = null;
+
   function renderAgentPermission(request) {
+    agentPermission = request;
     if (!request) {
       agentAskEl.classList.remove('open');
       agentAskDetailEl.textContent = '';
       return;
     }
     agentAskEl.classList.add('open');
-    agentAskTitleEl.textContent = '¿Le doy permiso para ' + request.title + '?';
+    agentAskTitleEl.textContent = T.askTitle(request.title);
     // The raw command, verbatim: this is what the user is actually approving.
     agentAskDetailEl.textContent = request.detail || '';
-    agentAskHintEl.textContent =
-      'Ctrl+; y di "sí", "no", o "sí a todo" para que no vuelva a preguntar.';
+    agentAskHintEl.textContent = T.askHint;
   }
 
   function addMilestone(text) {
@@ -624,24 +683,44 @@
     if (missingRequired) {
       const button = document.createElement('button');
       button.className = 'setup-button';
-      button.textContent = 'Configurar Kato';
+      button.textContent = T.setup;
       button.addEventListener('click', () => post({ type: 'command', command: 'kato.setup' }));
       setupEl.appendChild(button);
     } else {
       const examples = document.createElement('div');
       examples.className = 'setup-examples';
-      examples.textContent =
-        'Prueba: «dame un tour por este repo» · «llévame a la función main» · «agrega validación al formulario de login»';
+      examples.textContent = T.examples;
       setupEl.appendChild(examples);
     }
   }
 
-  const STATUS_LABEL = {
-    idle: 'Idle — Ctrl+; to talk',
-    listening: 'Listening…',
-    thinking: 'Thinking…',
-    speaking: 'Speaking…',
-  };
+  let panelState = 'idle';
+
+  /** Re-renders every piece of fixed text after a language change. */
+  function applyLanguage(lang) {
+    T = STRINGS[lang] || STRINGS.en;
+    document.documentElement.lang = lang;
+    statusEl.textContent = T.status[panelState] || panelState;
+    if (emptyTitleEl) {
+      emptyTitleEl.innerHTML = T.emptyTitle;
+    }
+    hintEl.innerHTML = T.hint;
+    unlockEl.textContent = T.unlock;
+    clearEl.textContent = T.clear;
+    sendEl.textContent = T.send;
+    if (!composerEl.classList.contains('awaiting')) {
+      inputEl.placeholder = T.placeholder;
+    }
+    renderLogSummary();
+    if (agentStatus) {
+      renderAgentStatus(agentStatus);
+    } else {
+      agentNameEl.textContent = T.agent;
+    }
+    if (agentPermission) {
+      renderAgentPermission(agentPermission);
+    }
+  }
 
   window.addEventListener('message', (event) => {
     const msg = event.data;
@@ -668,7 +747,7 @@
         break;
       case 'requestInput':
         openComposer({
-          placeholder: msg.placeholder || 'Pega el valor aquí…',
+          placeholder: msg.placeholder || T.pasteValue,
           question: msg.question,
           awaiting: true,
         });
@@ -677,7 +756,8 @@
         vuEl.style.width = Math.min(100, Math.round(msg.value * 300)) + '%';
         break;
       case 'status':
-        statusEl.textContent = STATUS_LABEL[msg.state] || msg.state;
+        panelState = msg.state;
+        statusEl.textContent = T.status[msg.state] || msg.state;
         statusEl.dataset.state = msg.state;
         headerEl.dataset.state = msg.state;
         if (msg.state !== 'listening') {
@@ -708,12 +788,16 @@
       case 'setupStatus':
         renderSetup(msg.items);
         break;
+      case 'lang':
+        applyLanguage(msg.value);
+        break;
       case 'zoom':
         document.body.style.zoom = String(Math.min(2, Math.max(0.7, Number(msg.value) || 1)));
         break;
     }
   });
 
+  applyLanguage('en');
   post({ type: 'ready' });
   diag('webview loaded');
 })();

@@ -74,7 +74,7 @@ export interface AgentDetection {
 }
 
 /** Best-effort: good enough to pick a default and to explain what is missing. */
-export function detectAgents(): AgentDetection[] {
+export function detectAgents(es = true): AgentDetection[] {
   const home = os.homedir();
   const claudeCli = findBinary('claude', [path.join(home, '.claude', 'local')]);
   let claudeLoggedIn = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -95,8 +95,12 @@ export function detectAgents(): AgentDetection[] {
       hint: claudeLoggedIn
         ? ''
         : claudeCli
-          ? 'Corre "claude" en una terminal una vez para iniciar sesión.'
-          : 'Instala Claude Code (npm i -g @anthropic-ai/claude-code) y corre "claude" para iniciar sesión.',
+          ? es
+            ? 'Corre "claude" en una terminal una vez para iniciar sesión.'
+            : 'Run "claude" in a terminal once to sign in.'
+          : es
+            ? 'Instala Claude Code (npm i -g @anthropic-ai/claude-code) y corre "claude" para iniciar sesión.'
+            : 'Install Claude Code (npm i -g @anthropic-ai/claude-code) and run "claude" to sign in.',
     },
     {
       id: 'codex',
@@ -105,32 +109,38 @@ export function detectAgents(): AgentDetection[] {
       hint: codexLoggedIn
         ? ''
         : codexCli
-          ? 'Corre "codex login" en una terminal.'
-          : 'Instala Codex (npm i -g @openai/codex) y corre "codex login".',
+          ? es
+            ? 'Corre "codex login" en una terminal.'
+            : 'Run "codex login" in a terminal.'
+          : es
+            ? 'Instala Codex (npm i -g @openai/codex) y corre "codex login".'
+            : 'Install Codex (npm i -g @openai/codex) and run "codex login".',
     },
   ];
 }
 
-export async function checkSetup(secrets: vscode.SecretStorage): Promise<SetupItem[]> {
+export async function checkSetup(secrets: vscode.SecretStorage, es = true): Promise<SetupItem[]> {
   const keys = await keyPresence(secrets);
   const config = getConfig();
   const items: SetupItem[] = [];
 
   items.push({
-    label: 'Micrófono (ffmpeg)',
+    label: es ? 'Micrófono (ffmpeg)' : 'Microphone (ffmpeg)',
     ok: Boolean(findBinary('ffmpeg')),
-    hint: 'Instálalo con: brew install ffmpeg',
+    hint: es ? 'Instálalo con: brew install ffmpeg' : 'Install it with: brew install ffmpeg',
   });
   items.push({
-    label: 'API key de OpenAI',
+    label: es ? 'API key de OpenAI' : 'OpenAI API key',
     ok: keys.openai,
-    hint: 'La usa el router de intenciones y las respuestas habladas.',
+    hint: es
+      ? 'La usa el router de intenciones y las respuestas habladas.'
+      : 'Kato uses it to understand requests and to answer.',
   });
 
   const voice = effectiveVoiceProviders(keys);
   for (const [kind, configured, effective] of [
-    ['Transcripción', config.sttProvider, voice.stt],
-    ['Voz', config.ttsProvider, voice.tts],
+    [es ? 'Transcripción' : 'Transcription', config.sttProvider, voice.stt],
+    [es ? 'Voz' : 'Voice', config.ttsProvider, voice.tts],
   ] as const) {
     if (configured === 'openai') {
       continue;
@@ -139,15 +149,18 @@ export async function checkSetup(secrets: vscode.SecretStorage): Promise<SetupIt
       label: `${kind}: ${PROVIDER_NAMES[configured] ?? configured}`,
       ok: configured === effective,
       optional: true,
-      hint: `Falta la key de ${PROVIDER_NAMES[configured] ?? configured}; mientras tanto uso OpenAI.`,
+      hint: es
+        ? `Falta la key de ${PROVIDER_NAMES[configured] ?? configured}; mientras tanto uso OpenAI.`
+        : `No ${PROVIDER_NAMES[configured] ?? configured} key yet; using OpenAI meanwhile.`,
     });
   }
 
-  const agent = detectAgents().find((candidate) => candidate.id === config.agentProvider);
+  const agent = detectAgents(es).find((candidate) => candidate.id === config.agentProvider);
   items.push({
-    label: `Agente de código: ${PROVIDER_NAMES[config.agentProvider] ?? config.agentProvider}`,
+    label: `${es ? 'Agente de código' : 'Coding agent'}: ${PROVIDER_NAMES[config.agentProvider] ?? config.agentProvider}`,
     ok: agent ? agent.loggedIn : false,
-    hint: agent?.hint || 'Proveedor desconocido: revisa kato.agent.provider.',
+    hint:
+      agent?.hint || (es ? 'Proveedor desconocido: revisa kato.agent.provider.' : 'Unknown provider: check kato.agent.provider.'),
   });
   return items;
 }

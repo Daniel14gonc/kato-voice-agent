@@ -35,6 +35,8 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   /** Replayed when the page (re)loads: it may come up after the status was sent. */
   private lastSetup: object | undefined;
   private lastZoom: object | undefined;
+  private lang: 'es' | 'en' = 'en';
+  private languageListener: (() => void) | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -86,6 +88,7 @@ export class AudioBridge implements vscode.WebviewViewProvider {
       case 'ready':
         this.ready = true;
         this.readyResolve?.();
+        this.post({ type: 'lang', value: this.lang });
         if (this.lastSetup) {
           this.post(this.lastSetup);
         }
@@ -191,6 +194,25 @@ export class AudioBridge implements vscode.WebviewViewProvider {
   setZoom(zoom: number): void {
     this.lastZoom = { type: 'zoom', value: zoom };
     this.post(this.lastZoom);
+  }
+
+  /** The panel's fixed text follows the conversation: 'es' or anything else (English). */
+  get language(): 'es' | 'en' {
+    return this.lang;
+  }
+
+  setLanguage(language: string | undefined): void {
+    const lang = language === 'es' ? 'es' : 'en';
+    if (lang === this.lang) {
+      return;
+    }
+    this.lang = lang;
+    this.post({ type: 'lang', value: lang });
+    this.languageListener?.();
+  }
+
+  onLanguageChange(listener: () => void): void {
+    this.languageListener = listener;
   }
 
   /** Setup checklist for the empty state (keys, ffmpeg, agent CLI). */
