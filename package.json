@@ -1,0 +1,260 @@
+{
+  "name": "kato",
+  "displayName": "Kato",
+  "description": "Talk to your development environment. Voice-native coding: navigate, understand, edit, debug, and drive your coding agent by voice.",
+  "version": "0.1.0",
+  "publisher": "kato-dev",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kato.toggleTalk",
+        "title": "Kato: Toggle Talk",
+        "icon": "$(mic)"
+      },
+      {
+        "command": "kato.cancel",
+        "title": "Kato: Cancel / Stop Speaking"
+      },
+      {
+        "command": "kato.configureApiKeys",
+        "title": "Kato: Configure API Keys"
+      },
+      {
+        "command": "kato.showLog",
+        "title": "Kato: Show Log"
+      },
+      {
+        "command": "kato.clearRepoNotes",
+        "title": "Kato: Forget Repo Notes (re-explore from scratch)"
+      },
+      {
+        "command": "kato.forgetTestCommand",
+        "title": "Kato: Forget Test Command"
+      },
+      {
+        "command": "kato.evalRouter",
+        "title": "Kato: Run Router Evaluation (golden suite)"
+      },
+      {
+        "command": "kato.typeMessage",
+        "title": "Kato: Type or Paste a Message"
+      },
+      {
+        "command": "kato.chooseVoice",
+        "title": "Kato: Choose Voice"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "kato.toggleTalk",
+        "key": "ctrl+;",
+        "mac": "ctrl+;"
+      },
+      {
+        "command": "kato.typeMessage",
+        "key": "ctrl+shift+;",
+        "mac": "ctrl+shift+;"
+      },
+      {
+        "command": "kato.cancel",
+        "key": "escape",
+        "when": "kato.busy && !editorHasSelection && !suggestWidgetVisible"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "katoPanel",
+          "title": "Kato",
+          "icon": "media/kato.svg"
+        }
+      ]
+    },
+    "views": {
+      "katoPanel": [
+        {
+          "type": "webview",
+          "id": "kato.audio",
+          "name": "Voice"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kato",
+      "properties": {
+        "kato.models.router": {
+          "type": "string",
+          "default": "gpt-4.1-mini",
+          "description": "OpenAI model used for intent routing (fast/cheap, runs on every utterance)."
+        },
+        "kato.models.explainer": {
+          "type": "string",
+          "default": "gpt-5.6-luna",
+          "description": "OpenAI model used for spoken answers and quick code explanations (kato.llm.provider = openai). gpt-5.6-luna runs with reasoning off for low TTFT."
+        },
+        "kato.models.anthropicExplainer": {
+          "type": "string",
+          "default": "claude-haiku-4-5",
+          "description": "Anthropic model used for spoken answers (kato.llm.provider = anthropic). claude-haiku-4-5 starts speaking fastest; claude-sonnet-5 is smarter."
+        },
+        "kato.llm.provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic"
+          ],
+          "default": "openai",
+          "description": "Provider for Kato's internal LLM (spoken answers). Soniox has no LLM, so this stays OpenAI or Anthropic. Takes effect on the next utterance."
+        },
+        "kato.stt.provider": {
+          "type": "string",
+          "enum": [
+            "soniox",
+            "openai",
+            "assemblyai"
+          ],
+          "default": "soniox",
+          "description": "Speech-to-text provider. Takes effect on the next utterance."
+        },
+        "kato.stt.model": {
+          "type": "string",
+          "default": "gpt-4o-transcribe",
+          "description": "OpenAI transcription model used over the Realtime API (provider: openai)."
+        },
+        "kato.stt.sonioxModel": {
+          "type": "string",
+          "default": "stt-rt-v5",
+          "description": "Soniox real-time model (provider: soniox)."
+        },
+        "kato.stt.assemblyaiModel": {
+          "type": "string",
+          "default": "universal-3-5-pro",
+          "description": "AssemblyAI streaming model (provider: assemblyai). universal-3-5-pro code-switches Spanish/English natively."
+        },
+        "kato.stt.silenceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Extra silence (ms) before your utterance is considered finished. Soniox: grace window after its endpoint detection — if you resume speaking within it, the utterance continues (raise this if Kato cuts you off mid-sentence). OpenAI: server VAD silence duration."
+        },
+        "kato.stt.language": {
+          "type": "string",
+          "default": "",
+          "description": "Optional ISO language hint for transcription (e.g. 'es', 'en'). Leave empty for auto."
+        },
+        "kato.stt.prompt": {
+          "type": "string",
+          "default": "The speaker is a programmer who talks in Spanish and English, often mixed. The only possible languages are Spanish and English. Technical terms, identifiers and product names stay in English.",
+          "description": "Bias prompt for transcription (helps with Spanish/English code-switching)."
+        },
+        "kato.tts.provider": {
+          "type": "string",
+          "enum": [
+            "soniox",
+            "openai"
+          ],
+          "default": "soniox",
+          "description": "Text-to-speech provider. Takes effect on the next sentence."
+        },
+        "kato.tts.model": {
+          "type": "string",
+          "default": "gpt-4o-mini-tts",
+          "description": "OpenAI TTS model (provider: openai)."
+        },
+        "kato.tts.sonioxModel": {
+          "type": "string",
+          "default": "tts-rt-v2",
+          "description": "Soniox TTS model (provider: soniox)."
+        },
+        "kato.tts.voice": {
+          "type": "string",
+          "default": "Logan",
+          "description": "Voice for spoken responses. Run \"Kato: Choose Voice\" to browse the provider's catalog and audition voices instead of typing a name here."
+        },
+        "kato.tour.granularity": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "block",
+            "function",
+            "section"
+          ],
+          "enumDescriptions": [
+            "The agent picks per question: repo-wide → sections, a file/feature → function-by-function, a single function in depth → block-by-block. Voice requests (\"línea por línea\", \"por encima\") always win.",
+            "Always block/line-level stops — line-by-line walk-through of a small piece of code (up to 12 stops).",
+            "Always one stop per function/method — detailed walk-through (up to 12 stops).",
+            "Always section-level stops — faster overview (up to 8 stops)."
+          ],
+          "default": "auto",
+          "description": "How fine-grained deep-understanding tours are."
+        },
+        "kato.agent.provider": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex"
+          ],
+          "enumDescriptions": [
+            "Claude Code: live steering mid-task, plan mode, and per-action voice approvals.",
+            "Codex: turn-based (instructions queue until the current turn ends) and sandbox-based permissions instead of voice approvals."
+          ],
+          "default": "claude-code",
+          "description": "Coding agent used for delegation (Agent mode) and deep understanding. Takes effect on the next task."
+        },
+        "kato.agent.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model the coding agent uses (Claude Code: sonnet, opus…; Codex: gpt-5-codex…). Empty = the agent's own default."
+        },
+        "kato.agent.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the agent CLI binary (e.g. claude). Empty = auto-detect."
+        },
+        "kato.mic.device": {
+          "type": "string",
+          "default": "",
+          "description": "Microphone device for ffmpeg capture (avfoundation name or index on macOS). Empty = system default."
+        },
+        "kato.tts.instructions": {
+          "type": "string",
+          "default": "Speak fast, with an energetic and natural conversational pace, like a colleague pair-programming. Never drag words or pause dramatically. Pronounce code identifiers in English.",
+          "description": "Style instructions passed to the TTS model (gpt-4o-mini-tts only)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "eval:router": "node esbuild.mjs && node dist/eval-router.js",
+    "vscode:prepublish": "npm run build",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.235",
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@openai/codex-sdk": "^0.148.0",
+    "openai": "^7.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "1.93.0",
+    "@types/ws": "^8.5.12",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

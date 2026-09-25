@@ -1,0 +1,1143 @@
+[
+  {
+    "utterance": "ve al segundo",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "ábreme el tercero de la lista",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "open the fourth one",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "llévame al primero de esos resultados que dijiste",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "el número cinco, ese, ábrelo",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "go to result two please",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "ve al match dos, el del recorder",
+    "expect": "nav_goto_ref",
+    "context": "withReferents"
+  },
+  {
+    "utterance": "llévame a la parada dos",
+    "expect": "nav_goto_ref",
+    "context": "tourActive",
+    "note": "positional jump to a listed stop, not next/prev tour navigation"
+  },
+  {
+    "utterance": "debuggea este archivo",
+    "expect": "debug_control",
+    "expectAction": "start",
+    "context": "default"
+  },
+  {
+    "utterance": "pon un breakpoint en la línea 12",
+    "expect": "debug_control",
+    "expectAction": "set_breakpoint",
+    "context": "default"
+  },
+  {
+    "utterance": "siguiente",
+    "expect": "debug_control",
+    "expectAction": "step_over",
+    "context": "debugPaused",
+    "note": "no tour active — while paused in the debugger, next means step over"
+  },
+  {
+    "utterance": "what is items now?",
+    "expect": "debug_control",
+    "expectAction": "evaluate",
+    "context": "debugPaused"
+  },
+  {
+    "utterance": "cuánto vale total aquí",
+    "expect": "debug_control",
+    "expectAction": "evaluate",
+    "context": "debugPaused"
+  },
+  {
+    "utterance": "continúa hasta el siguiente breakpoint",
+    "expect": "debug_control",
+    "expectAction": "continue",
+    "context": "debugPaused"
+  },
+  {
+    "utterance": "para el debugger",
+    "expect": "debug_control",
+    "expectAction": "stop",
+    "context": "debugPaused"
+  },
+  {
+    "utterance": "arregla el bug que acabamos de ver",
+    "expect": "agent_delegate",
+    "context": "debugPaused",
+    "note": "fixing is the agent's job, not the debugger's"
+  },
+  {
+    "utterance": "llévame a la función startListening",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "take me to shopping_cart.py",
+    "expect": "nav_goto_symbol",
+    "context": "default",
+    "note": "a file, not a symbol — nav_goto_symbol handles both; search_code is only for dictated literal strings"
+  },
+  {
+    "utterance": "ábreme el archivo capture punto p y",
+    "expect": "nav_goto_symbol",
+    "context": "default",
+    "note": "spoken filename"
+  },
+  {
+    "utterance": "open the srs file",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "open the class AudioRecorder",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "ábreme handleTranscript",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "jump to the RouterService symbol",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "ponme en el método dispatch del router",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "llévame al archivo, digo, a la función esteim audio segunds",
+    "expect": "nav_goto_symbol",
+    "context": "default",
+    "note": "STT mangled estimate_audio_seconds; still a named symbol jump"
+  },
+  {
+    "utterance": "llévame al método processChunk del recorder",
+    "expect": "nav_goto_symbol",
+    "context": "default"
+  },
+  {
+    "utterance": "¿quién usa esto?",
+    "expect": "find_references",
+    "context": "selection"
+  },
+  {
+    "utterance": "find references to respond",
+    "expect": "find_references",
+    "context": "default"
+  },
+  {
+    "utterance": "¿desde dónde se llama esta función?",
+    "expect": "find_references",
+    "context": "selection"
+  },
+  {
+    "utterance": "who calls startListening?",
+    "expect": "find_references",
+    "context": "default"
+  },
+  {
+    "utterance": "muéstrame todos los usos de AudioRecorder",
+    "expect": "find_references",
+    "context": "default"
+  },
+  {
+    "utterance": "quiénes están llamando este método, o sea todos los call sites",
+    "expect": "find_references",
+    "context": "selection"
+  },
+  {
+    "utterance": "show me every place that imports the config module",
+    "expect": "find_references",
+    "context": "default"
+  },
+  {
+    "utterance": "busca el texto TODO",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "search for the string API_KEY",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "busca literalmente la palabra deprecated en todo el repo",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "hazme un grep de OPENAI_API_KEY",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "find the exact text connection refused in the logs folder",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "búscame el string exacto sancho guion bajo voice",
+    "expect": "search_code",
+    "context": "default",
+    "note": "user dictates a literal string, so text search not semantic"
+  },
+  {
+    "utterance": "haz un search del texto FIXME dos puntos",
+    "expect": "search_code",
+    "context": "default"
+  },
+  {
+    "utterance": "busca el texto exacto rate limit exceeded, tal cual",
+    "expect": "search_code",
+    "context": "default",
+    "note": "explicit literal, NOT find_feature"
+  },
+  {
+    "utterance": "¿dónde está implementado el JWT?",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "where is the email sending handled?",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "take me to the billing logic",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "¿en qué parte del código se hace el rate limiting?",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "dónde vive la lógica de reintentos",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "where's the code that decides which tool to call?",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "llévame a donde se maneja el login con Google",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "dónde está el feature de transcripción, no el texto eh, la implementación",
+    "expect": "find_feature",
+    "context": "default",
+    "note": "user explicitly rejects literal search: semantic locate"
+  },
+  {
+    "utterance": "where is the retry logic implemented?",
+    "expect": "find_feature",
+    "context": "tourActive",
+    "note": "tour is active but this is a semantic locate, NOT tour_control"
+  },
+  {
+    "utterance": "¿dónde está implementado el streaming?",
+    "expect": "find_feature",
+    "context": "withReferents",
+    "note": "referents are listed but user names a concept, NOT nav_goto_ref"
+  },
+  {
+    "utterance": "dónde está el handling de los websockets",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "where lives la lógica del checkout",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "en qué archivo se arma el prompt del router",
+    "expect": "find_feature",
+    "context": "default"
+  },
+  {
+    "utterance": "¿qué hace esta función?",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "explícame esto",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "explain this file to me",
+    "expect": "explain_quick",
+    "context": "default"
+  },
+  {
+    "utterance": "explícame este archivo",
+    "expect": "explain_quick",
+    "context": "default",
+    "note": "scoped to the open file, not repo-wide"
+  },
+  {
+    "utterance": "¿qué hace lo que tengo seleccionado?",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "what does this regex do?",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "explícame qué hace el tercero de la lista",
+    "expect": "explain_quick",
+    "context": "withReferents",
+    "note": "explain a referent, not navigate to it"
+  },
+  {
+    "utterance": "ok y esto qué es",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "give me a quick rundown of what's on screen",
+    "expect": "explain_quick",
+    "context": "default"
+  },
+  {
+    "utterance": "explícame rápido este método, sin meterte en todo el repo",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "eh, puedes… no espera, mejor explícame esto",
+    "expect": "explain_quick",
+    "context": "selection",
+    "note": "self-correction; final intent is explain the selection"
+  },
+  {
+    "utterance": "qué hace este hook, explícamelo quick",
+    "expect": "explain_quick",
+    "context": "selection"
+  },
+  {
+    "utterance": "explícame la arquitectura del repo",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "how does the whole auth flow work?",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "explícame todo el repo",
+    "expect": "explain_deep",
+    "context": "default",
+    "note": "repo-wide scope, contrast with explícame este archivo"
+  },
+  {
+    "utterance": "cómo se conectan el frontend y el backend en este proyecto",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "walk me through how a request travels from the mic all the way to the tool call",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "¿por qué este proyecto tiene dos routers? investígalo bien y me dices",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "explain how the whole tour system fits together across files",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "hazme un deep dive de cómo funciona el pipeline completo de audio",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "quiero entender de punta a punta cómo funciona el sistema de permisos",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "explícame cómo interactúa este archivo con el resto del sistema",
+    "expect": "explain_deep",
+    "context": "selection",
+    "note": "cross-file question even though there is a selection"
+  },
+  {
+    "utterance": "guide me through the code",
+    "expect": "explain_deep",
+    "context": "withRepoNotes",
+    "note": "explicit tour request: cached repo notes must not downgrade it to answer"
+  },
+  {
+    "utterance": "dame un tour por el código",
+    "expect": "explain_deep",
+    "context": "withRepoNotes",
+    "note": "explicit tour request: cached repo notes must not downgrade it to answer"
+  },
+  {
+    "utterance": "guíame por el flujo de captura, paso a paso",
+    "expect": "explain_deep",
+    "context": "withRepoNotes"
+  },
+  {
+    "utterance": "walk me through the capture flow",
+    "expect": "explain_deep",
+    "context": "default"
+  },
+  {
+    "utterance": "why aren't you giving me a tour? guide me through it",
+    "expect": "explain_deep",
+    "context": "withRepoNotes",
+    "note": "user insisting after a verbal answer — still a tour request"
+  },
+  {
+    "utterance": "siguiente",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "next",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "anterior, regrésate",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "repite eso otra vez",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "ya, termina el tour",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "ya entendí, pásale al siguiente stop",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "go back one step in the tour",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "sal del tour porfa",
+    "expect": "tour_control",
+    "context": "tourActive"
+  },
+  {
+    "utterance": "crea un main.py con una función que sume dos números",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "arregla el bug del login",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "hazme un plan para mover esto a un servicio aparte",
+    "expect": "agent_delegate",
+    "context": "selection"
+  },
+  {
+    "utterance": "cambia esto para que use async",
+    "expect": "agent_delegate",
+    "context": "selection",
+    "note": "code change request; Kato never writes code itself, NOT explain_quick"
+  },
+  {
+    "utterance": "refactor this into smaller functions",
+    "expect": "agent_delegate",
+    "context": "selection"
+  },
+  {
+    "utterance": "añádele tests a este módulo",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "write me a script that converts wav to mp3",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "quita el console.log ese que dejé en el recorder",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "puedes hacer un refactor del billing module para que use el client nuevo",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "implementa el endpoint de logout",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "make this function handle the empty list case",
+    "expect": "agent_delegate",
+    "context": "selection"
+  },
+  {
+    "utterance": "necesito que agregues un retry con backoff exponencial en el cliente de OpenAI, eh, y que quede configurable desde el settings",
+    "expect": "agent_delegate",
+    "context": "default",
+    "note": "run-on dictation, single implement request"
+  },
+  {
+    "utterance": "fixea el typo del README y de paso actualiza la sección de install",
+    "expect": "agent_delegate",
+    "context": "default"
+  },
+  {
+    "utterance": "rename this variable everywhere, it's called tmp2 and it's awful",
+    "expect": "agent_delegate",
+    "context": "selection"
+  },
+  {
+    "utterance": "¿qué está haciendo?",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "status"
+  },
+  {
+    "utterance": "detente",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "stop"
+  },
+  {
+    "utterance": "sí",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "note": "approves the pending Bash command",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "no, no corras eso",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "deny"
+  },
+  {
+    "utterance": "adelante",
+    "expect": "agent_control",
+    "context": "planReady",
+    "note": "approve plan execution",
+    "expectAction": "continue"
+  },
+  {
+    "utterance": "ejecútalo",
+    "expect": "agent_control",
+    "context": "planReady",
+    "expectAction": "continue"
+  },
+  {
+    "utterance": "pon los permisos en automático",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "set_mode"
+  },
+  {
+    "utterance": "ponlo en modo manual mejor",
+    "expect": "agent_control",
+    "context": "default",
+    "expectAction": "set_mode"
+  },
+  {
+    "utterance": "apruébalo, dale",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "go ahead and run the plan",
+    "expect": "agent_control",
+    "context": "planReady",
+    "expectAction": "continue"
+  },
+  {
+    "utterance": "how's it going, are you almost done with that?",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "status"
+  },
+  {
+    "utterance": "para al agente, mejor lo hago yo",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "stop"
+  },
+  {
+    "utterance": "yeah, approve it",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "muéstrame el diff",
+    "expect": "git_diff",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "¿qué cambié?",
+    "expect": "git_diff",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "show me what's changed so far",
+    "expect": "git_diff",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "explícame los cambios que tengo sin commitear",
+    "expect": "git_diff",
+    "context": "gitChanges",
+    "note": "explain scoped to the working diff, not explain_quick"
+  },
+  {
+    "utterance": "enséñame el diff de lo que llevo hoy",
+    "expect": "git_diff",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "haz stage de todo",
+    "expect": "git_stage",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "agrega los cambios",
+    "expect": "git_stage",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "stage everything",
+    "expect": "git_stage",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "add the modified files to the index",
+    "expect": "git_stage",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "hazme stage de todos los archivos que toqué",
+    "expect": "git_stage",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "haz commit",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "commitea con el mensaje arregla el login",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "commit this with a message saying fix router fallback",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "guarda esto en un commit porfa",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "puedes hacer un commit del refactor",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "commit, mensaje, eh, actualiza dependencias",
+    "expect": "git_commit",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "corre los tests",
+    "expect": "run_tests",
+    "context": "default"
+  },
+  {
+    "utterance": "run the tests",
+    "expect": "run_tests",
+    "context": "default"
+  },
+  {
+    "utterance": "corre los tests del billing module",
+    "expect": "run_tests",
+    "context": "default"
+  },
+  {
+    "utterance": "a ver si pasan las pruebas",
+    "expect": "run_tests",
+    "context": "default"
+  },
+  {
+    "utterance": "run the test suite one more time",
+    "expect": "run_tests",
+    "context": "default"
+  },
+  {
+    "utterance": "ejecuta los unit tests del router",
+    "expect": "run_tests",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "sí, confirma",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation"
+  },
+  {
+    "utterance": "no, cancela",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation"
+  },
+  {
+    "utterance": "yes, go ahead",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation"
+  },
+  {
+    "utterance": "sí",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation",
+    "note": "same word resolves the pending confirmation here, not agent approval"
+  },
+  {
+    "utterance": "mejor no, cancélalo",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation"
+  },
+  {
+    "utterance": "confirm it",
+    "expect": "confirm_action",
+    "context": "pendingConfirmation"
+  },
+  {
+    "utterance": "¿usaste pip o uv?",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "hola",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "¿qué puedes hacer?",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "sí",
+    "expect": "answer",
+    "context": "default",
+    "note": "nothing pending, so it is just conversational"
+  },
+  {
+    "utterance": "llévame a la función main",
+    "expect": "answer",
+    "context": "noWorkspace",
+    "note": "no folder open, Kato must say so"
+  },
+  {
+    "utterance": "¿dónde está implementado el login?",
+    "expect": "answer",
+    "context": "noWorkspace",
+    "note": "no folder open"
+  },
+  {
+    "utterance": "muéstrame el diff",
+    "expect": "answer",
+    "context": "noWorkspace",
+    "note": "no folder open"
+  },
+  {
+    "utterance": "run the tests",
+    "expect": "answer",
+    "context": "noWorkspace",
+    "note": "no folder open"
+  },
+  {
+    "utterance": "hey Cato, ¿me estás escuchando?",
+    "expect": "answer",
+    "context": "default",
+    "note": "wake word misheard"
+  },
+  {
+    "utterance": "Ricardo, ¿sigues ahí?",
+    "expect": "answer",
+    "context": "default",
+    "note": "assistant name misheard by STT"
+  },
+  {
+    "utterance": "what model are you running on?",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "oye, eso que hiciste, ¿fue con npm o con yarn?",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "¿por qué elegiste ese archivo y no el otro?",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "gracias, buenísimo, quedó bien",
+    "expect": "answer",
+    "context": "default"
+  },
+  {
+    "utterance": "karo, what's the difference between a tour and an explanation?",
+    "expect": "answer",
+    "context": "default",
+    "note": "question about Kato itself, name misheard"
+  },
+  {
+    "utterance": "eso",
+    "expect": "ask_clarification",
+    "context": "default"
+  },
+  {
+    "utterance": "hazlo",
+    "expect": "ask_clarification",
+    "context": "default",
+    "note": "no antecedent, nothing pending"
+  },
+  {
+    "utterance": "siguiente",
+    "expect": "ask_clarification",
+    "context": "default",
+    "note": "no tour active, so next what"
+  },
+  {
+    "utterance": "el otro",
+    "expect": "ask_clarification",
+    "context": "default"
+  },
+  {
+    "utterance": "cámbialo ahí donde estaba",
+    "expect": "ask_clarification",
+    "context": "default"
+  },
+  {
+    "utterance": "can you do that thing again?",
+    "expect": "ask_clarification",
+    "context": "default"
+  },
+  {
+    "utterance": "búscalo",
+    "expect": "ask_clarification",
+    "context": "default",
+    "note": "unclear what and whether literal or semantic"
+  },
+  {
+    "utterance": "kettle, eh, lo de antes, ya sabes",
+    "expect": "ask_clarification",
+    "context": "default",
+    "note": "name misheard plus no recoverable intent"
+  },
+  {
+    "utterance": "vamos con eso entonces",
+    "expect": "ask_clarification",
+    "context": "default"
+  },
+  {
+    "utterance": "can you switch to a new branch called main?",
+    "expect": "git_branch",
+    "context": "gitChanges",
+    "note": "observed failure: routed to git_diff"
+  },
+  {
+    "utterance": "cámbiate a la rama main",
+    "expect": "git_branch",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "créame una branch que se llame feature slash login",
+    "expect": "git_branch",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "pásate a develop porfa",
+    "expect": "git_branch",
+    "context": "default"
+  },
+  {
+    "utterance": "haz push de esto al remoto",
+    "expect": "agent_delegate",
+    "context": "gitChanges",
+    "note": "git op outside the catalog goes to the agent"
+  },
+  {
+    "utterance": "can you init a git repository here?",
+    "expect": "agent_delegate",
+    "context": "default",
+    "note": "git init is not a catalog tool"
+  },
+  {
+    "utterance": "haz merge de develop en esta rama",
+    "expect": "agent_delegate",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "resuelve los conflictos del merge",
+    "expect": "agent_delegate",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "yes, and put it on auto mode for permissions",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "note": "compound: approve now covers the \"stop asking\" half; Kato remembers it itself",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "sí, y ya no me preguntes más",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "dale, y ponlo en automático de ahora en adelante",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "approve"
+  },
+  {
+    "utterance": "quiero poner un remote origin para este repo",
+    "expect": "ask_input",
+    "context": "gitChanges",
+    "note": "the URL must be pasted, not dictated"
+  },
+  {
+    "utterance": "conéctalo con mi repositorio de github",
+    "expect": "ask_input",
+    "context": "default"
+  },
+  {
+    "utterance": "add the origin remote please",
+    "expect": "ask_input",
+    "context": "gitChanges"
+  },
+  {
+    "utterance": "ponle la api key de stripe al archivo de entorno",
+    "expect": "ask_input",
+    "context": "default"
+  },
+  {
+    "utterance": "clona el repo de la empresa aquí",
+    "expect": "ask_input",
+    "context": "default"
+  },
+  {
+    "utterance": "te voy a pasar el resumen de un bug",
+    "expect": "ask_input",
+    "context": "default",
+    "note": "user announces a paste"
+  },
+  {
+    "utterance": "espérate, te mando el error que me sale",
+    "expect": "ask_input",
+    "context": "default"
+  },
+  {
+    "utterance": "let me paste the log for you",
+    "expect": "ask_input",
+    "context": "default"
+  },
+  {
+    "utterance": "arregla esto: Traceback (most recent call last):\n  File \"/app/study/capture.py\", line 88, in capture_word\n    payload = analyze(text)[\"items\"]\n  File \"/app/study/llm.py\", line 42, in analyze\n    return json.loads(response.text)\nKeyError: 'items'",
+    "expect": "agent_delegate",
+    "context": "default",
+    "note": "pasted material implying work"
+  },
+  {
+    "utterance": "Traceback (most recent call last):\n  File \"/app/study/capture.py\", line 88, in capture_word\n    payload = analyze(text)[\"items\"]\n  File \"/app/study/llm.py\", line 42, in analyze\n    return json.loads(response.text)\nKeyError: 'items'",
+    "expect": "agent_delegate",
+    "context": "default",
+    "note": "bare stack trace: fix it"
+  },
+  {
+    "utterance": "qué significa este error?\nTraceback (most recent call last):\n  File \"/app/study/capture.py\", line 88, in capture_word\n    payload = analyze(text)[\"items\"]\n  File \"/app/study/llm.py\", line 42, in analyze\n    return json.loads(response.text)\nKeyError: 'items'",
+    "expect": "answer",
+    "context": "default",
+    "note": "asks for meaning, not a fix"
+  },
+  {
+    "utterance": "okay, you did that, but I didn't see any of that",
+    "expect": "explain_deep",
+    "context": "agentWorking",
+    "note": "observed failure: routed to nav_goto_ref with no referents"
+  },
+  {
+    "utterance": "can you explain what you did?",
+    "expect": "explain_deep",
+    "context": "agentWorking",
+    "note": "must re-read the files, not paraphrase from memory"
+  },
+  {
+    "utterance": "muéstrame lo que acabas de hacer",
+    "expect": "explain_deep",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "walk me through the changes you made",
+    "expect": "explain_deep",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "llévame al segundo",
+    "expect": "ask_clarification",
+    "context": "default",
+    "note": "no referents exist: never nav_goto_ref"
+  },
+  {
+    "utterance": "ábreme el tercero",
+    "expect": "ask_clarification",
+    "context": "agentWorking",
+    "note": "no referents in this snapshot"
+  },
+  {
+    "utterance": "ponlo en automático",
+    "expect": "agent_control",
+    "context": "agentWorking",
+    "expectAction": "set_mode"
+  },
+  {
+    "utterance": "just give it auto permissions",
+    "expect": "agent_control",
+    "context": "agentWaitingApproval",
+    "expectAction": "set_mode"
+  },
+  {
+    "utterance": "Yes.",
+    "expect": "agent_control",
+    "expectAction": "approve",
+    "context": "agentWaitingApproval",
+    "note": "a bare yes while the agent waits went to confirm_action in a real session; the approval was swallowed and the tool timed out"
+  },
+  {
+    "utterance": "Sí.",
+    "expect": "agent_control",
+    "expectAction": "approve",
+    "context": "agentWaitingApproval"
+  },
+  {
+    "utterance": "Yes, you have to, obviously. Commit, and then push.",
+    "expect": "agent_delegate",
+    "context": "agentReady",
+    "note": "nothing pending: this is a new instruction, not an approval"
+  },
+  {
+    "utterance": "Yes, but I asked you to commit and then push to main.",
+    "expect": "agent_delegate",
+    "context": "agentReady"
+  },
+  {
+    "utterance": "sí, hazlo",
+    "expect": "agent_delegate",
+    "context": "agentReady"
+  },
+  {
+    "utterance": "te dije que lo hicieras, dale",
+    "expect": "agent_delegate",
+    "context": "agentReady"
+  },
+  {
+    "utterance": "¿qué modos de permisos tienes?",
+    "expect": "agent_control",
+    "expectAction": "list_modes",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "what permission levels can I put it on?",
+    "expect": "agent_control",
+    "expectAction": "list_modes",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "¿qué opciones de permisos hay para este agente?",
+    "expect": "agent_control",
+    "expectAction": "list_modes",
+    "context": "agentReady"
+  },
+  {
+    "utterance": "pásalo a modo plan",
+    "expect": "agent_control",
+    "expectAction": "set_mode",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "set auto permissions for the agent",
+    "expect": "agent_control",
+    "expectAction": "set_mode",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "ya no me preguntes más por nada, ponlo en automático",
+    "expect": "agent_control",
+    "expectAction": "set_mode",
+    "context": "agentWorking"
+  },
+  {
+    "utterance": "put it back on manual, I want to approve everything",
+    "expect": "agent_control",
+    "expectAction": "set_mode",
+    "context": "agentWorking"
+  }
+]
