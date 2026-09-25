@@ -2,7 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Kato Extension",
+      // Default for F5. On this machine `localhost` resolves to ::1 first and
+      // js-debug fails to attach to the extension host's inspector
+      // (ECONNREFUSED ::1), so the debugging config times out after 10 s.
+      // Without a debugger nothing needs to attach; logs are in "Kato: Show Log".
+      "name": "Run Kato (no debugger)",
+      "type": "extensionHost",
+      "request": "launch",
+      "noDebug": true,
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: build"
+    },
+    {
+      "name": "Debug Kato Extension",
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
